@@ -94,7 +94,7 @@ The configuration file allows you to adjust various settings, including the AI s
 - chunk_size: The size of each chunk of a message. Default: 200 characters.
 - max_ai_chunks: The maximum number of chunks allowed for a single message. Default: 4.
 - chunk_delay: The delay between sending each chunk. Default: 10 seconds.
-- local_location_string: The string identifying the location of the node. Default: "Near Boulder Station".
+- local_location_string: The string identifying the location of the node. Default: "on the mesh".
 - ai_node_name: The name of the AI node. Default: "Mesh-AI-Alpha".
 - force_node_num: Optionally override the node number. Default: null.
 - enable_twilio: Whether to enable Twilio SMS notifications. Default: false.
