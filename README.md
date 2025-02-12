@@ -73,6 +73,9 @@ ________________________________________________________________________________
 
 This calculated length determines how much text the system can send in a single response, optimizing the balance between message size and token limits to avoid truncation.
 
+_____________________________________________________________________________________________________________________________________________________________
+
+
 Client Mode
 The node running the system should be in "Client_Mute" mode to maximize the AI response efficiency. In this mode, the node does not send unnecessary beacons or forward other messages, leaving more of the duty cycle available for AI response transmissions.
 
