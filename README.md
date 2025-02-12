@@ -2,7 +2,7 @@ Meshtastic-AI: Off-Grid AI Chat Bot - ALPHA v0.1 - THE FIRST PUBLIC RELEASE!
 
 Overview
 
-Meshtastic-AI is an open-source project designed to integrate AI with Meshtastic nodes for off-grid communication. The bot listens for direct messages from users or /commands in the mesh network and responds by relaying information from LMStudio API (OpenAI and ollama coming soon). This allows users to interact with the system, ask questions, and receive AI-generated responses—even in remote areas without internet access.
+Meshtastic-AI is an open-source project designed to integrate AI with Meshtastic nodes for off-grid AI responses. The bot listens for direct messages from users or /commands in the mesh network and responds by relaying information from LMStudio API (OpenAI and ollama coming soon). This allows users to interact with the system, ask questions, and receive AI-generated responses—even in remote areas without internet access.
 
 Unlike traditional messaging systems, Meshtastic-AI does not focus on sending and receiving general messages across the mesh network. Instead, it serves as a bridge for off-grid questions and answers. It listens for direct messages or commands and uses an AI model to generate and send responses based on the query or command.
 
