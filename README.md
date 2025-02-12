@@ -206,7 +206,9 @@ Flask Web Interface
 The bot exposes the following web API:
 
 GET /messages: Returns a JSON feed of recent messages.
+
 GET /dashboard: Displays a simple HTML dashboard with recent messages.
+
 POST /send: Sends a message to a specified node in the mesh.
 
 _____________________________________________________________________________________________________________________________________________________________
