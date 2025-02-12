@@ -42,19 +42,27 @@ ________________________________________________________________________________
 
 The AI Service:
 
-The bot integrates with LMStudio or (soon) OpenAI APIs. When the bot receives a question or query, it forwards this to the configured AI service. It processes the response and sends it back to the mesh network, allowing users to receive intelligent answers, even without internet access.  Any model can be useed - as this script only acts as a forarder between the LMStudio or OpenAI API and the Meshtastic Network...  So - tailored models can be used in various situations...  You could have a model that is specifically for assistance or data or a model that just cracks jokes - you could even have a model that role plays while you are out playing airsoft - for example.
+The bot integrates with LMStudio or (soon) OpenAI APIs. When the bot receives a question or query, it forwards this to the configured AI service. It processes the response and sends it back to the mesh network, allowing users to receive intelligent answers, even without internet access.  Any model can be used - as this script only acts as a forwarder between the LMStudio or OpenAI API and the Meshtastic Network...  So - tailored models can be used in various situations...  You could have a model that is specifically for assistance or data or a model that just cracks jokes - you could even have a model that role plays while you are out playing airsoft - for example.
 
 
 Chunking and Network Optimization
+
 Since Meshtastic operates on a low bandwidth, limited duty cycle, especially in areas with regulatory restrictions (e.g., Europe’s 10% duty cycle limit), it is crucial to minimize congestion on the network.
 
 Meshtastic-AI uses message chunking to break long responses into smaller pieces, ensuring that each message is transmitted efficiently without overloading the network. These chunks are sent with a delay between each to ensure that the system adheres to Meshtastic’s duty cycle limitations.
 
-Chunk Size and Delay: You can adjust the chunk size, maximum number of chunks, and delay between chunks in the config.json file:
-chunk_size: Defines the maximum size of each chunk of a message.
-max_ai_chunks: Limits the maximum number of chunks to send for a single message.
-chunk_delay: Sets a delay (in seconds) between sending each chunk to prevent network congestion.
+Chunk Size and Delay: 
+
+You can adjust the chunk size, maximum number of chunks, and delay between chunks in the config.json file:
+
+- chunk_size: Defines the maximum size of each chunk of a message.
+
+- max_ai_chunks: Limits the maximum number of chunks to send for a single message.
+
+- chunk_delay: Sets a delay (in seconds) between sending each chunk to prevent network congestion.
+
 Maximum Token Calculation for LMStudio
+
 To reduce the risk of truncated AI responses, Meshtastic-AI automatically calculates the maximum number of tokens for LMStudio based on the chunk size and number of chunks. This ensures that responses from the AI are as complete as possible while adhering to the token limit. The token limit is calculated as:
 
 _____________________________________________________________________________________________________________________________________________________________
@@ -101,7 +109,7 @@ ________________________________________________________________________________
   "chunk_size": 200,
   "max_ai_chunks": 4,
   "chunk_delay": 10,
-  "local_location_string": "Near Boulder Station",
+  "local_location_string": "on the mesh",
   "ai_node_name": "Mesh-AI-Alpha",
   "force_node_num": null,
   "enable_twilio": false,
@@ -126,11 +134,17 @@ Channel /Slash Commands
 Meshtastic-AI listens for the following built-in commands:
 
 /about: Information about the bot.
+
 /ai: Query the AI for a response.
+
 /whereami: Get the GPS coordinates of the current node.
+
 /emergency /911: Trigger an emergency alert (SMS/Email).
+
 /test: A simple test message.  Takes the senders shortcode name and generates a response to facilitate easier range testing on channels.
+
 /help: List available commands.
+
 /motd: Display the message of the day.
 
 ****/commands are currently CASE SENSITIVE - this will be improved later.****
@@ -255,7 +269,13 @@ python --version
 _____________________________________________________________________________________________________________________________________________________________
 
 
-Clone the Meshtastic-AI repository to your local machine. If you don't have Git installed, you can download it from git-scm.com.
+Download the latest release or Clone the Meshtastic-AI repository to your local machine. 
+
+You can find releases here - https://github.com/mr-tbot/meshtastic-ai/releases
+
+If you don't have Git installed, you can download it from git-scm.com.
+
+_____________________________________________________________________________________________________________________________________________________________
 
 git clone https://github.com/mr-tbot/meshtastic-ai.git
 cd meshtastic-ai
@@ -301,7 +321,7 @@ lmstudio_url: Set the URL of the LMStudio API server. Example:
 
 - Set the local_location_string and ai_node_name to reflect your desired node settings.
 
-
+_____________________________________________________________________________________________________________________________________________________________
 
 force_node_num explaination
 
@@ -335,7 +355,7 @@ ________________________________________________________________________________
 _____________________________________________________________________________________________________________________________________________________________
 
 
-When to Use: Only modify this setting if you're experiencing issues with your node not being able to send or receive messages correctly. It helps ensure that your node is always using the correct node ID.
+When to Use: Only modify this setting if you're experiencing issues with your node not being able to send or receive messages correctly. It helps ensure that your node is always using the correct node ID.  This number changes on factory resets - and hopefully the issues i've had with auto-identifying the node-ID in some cases is resolved in the future...  For now, this is the way.
 
 
 _____________________________________________________________________________________________________________________________________________________________
@@ -366,12 +386,14 @@ Put the Meshtastic node into "Client_Mute" mode. This mode allows your node to r
 You can typically set this in the Meshtastic app or via the node's configuration commands.
 Note: This step is especially important for areas where the duty cycle is limited, like in Europe, where the duty cycle is restricted to 10%.
 
+IMPORTANT: while your node is connected via serial it will not be able to respond to your Meshtastic phone app for updating settings.  You must unplug and (if you have a battery installed) reboot your device before you will be able to load or change settings via the meshtastic phone app...  afterwards simply reconnect the node to your PC and restart the meshtastic_ai.py script.
+
 _____________________________________________________________________________________________________________________________________________________________
 
 
 Step 7: Run LMStudio - OpenAI and ollama coming soon!
 
-Ensure that LMStudio is running on your machine and that its web server is active. The bot will rely on this server to generate AI responses. Set the lmstudio_url in config.json to the correct address of your running LMStudio instance.
+Ensure that LMStudio is running on your machine and that its web server is active. The bot will rely on this server to generate AI responses. Set the lmstudio_url in config.json to the correct address of your running LMStudio instance.  Ensure your firewall and settings allows for LMStudio to function properly...  I won't go into setting up LMStudio - there are lots of resources on that topic.
 
 _____________________________________________________________________________________________________________________________________________________________
 
@@ -395,10 +417,8 @@ ________________________________________________________________________________
 
 MOTD Customization: The message of the day (MOTD) can be changed by modifying the motd.json file.
 
+_____________________________________________________________________________________________________________________________________________________________
 
+***Early Alpha: This is an early alpha release. The SMS and SMTP features remain UNTESTED and should not be relied upon for mission-critical implementations until the code matures further.***
 
-Early Alpha: This is an early alpha release. The SMS and SMTP features remain UNTESTED and should not be relied upon for mission-critical implementations until the code matures further.
-
-Developer Background: Hi- I'm TBOT.  I am not a professional coder but an avid computer nerd. This project was built using tools available to bridge gaps, with most of the code generated using OpenAI's GPT-4 1o model and Llama-based LLMs. While the code works well and was created from scratch in under 12 hours, it might benefit from a professional review. My ability to test and debug is limited, so feedback from experienced developers is encouraged. So far, the chat routing and reply system has been stable and effective.
-
-
+Developer Background: Hi- I'm TBOT.  I am not a professional coder but an avid computer nerd. This project was built using tools available to bridge gaps, with most of the code generated using OpenAI's GPT-4 1o model and Llama-based LLMs. While the code works well and was created from scratch in under 12 hours, it might benefit from a professional review. My ability to test and debug is limited, so feedback from experienced developers is encouraged. So far, the chat routing and reply system has been stable and effective...  If you're interested in contributing to this amazing project, feel free to reach out or send a request!
