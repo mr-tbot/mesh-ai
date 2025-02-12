@@ -303,11 +303,11 @@ lmstudio_url: Set the URL of the LMStudio API server. Example:
 
 
 
-force_node_num Explanation:
+force_node_num explaination
 
-"force_node_num" is an optional setting in the config.json file.
+"force_node_num" is an optional setting in the config.json file.  This option was implemented in case your Meshtastic node is having trouble sending or receiving messages. Sometimes, nodes might not properly identify themselves on the mesh network, causing communication issues.  This forces the script to identify and decode messages meant for the node attached to your machine via USB - and sometimes nodes do not proerly announce their node-ID over serial to the script.  At least in Alpha - you will likely need to set this.
 
-Purpose: This option was implemented in case your Meshtastic node is having trouble sending or receiving messages. Sometimes, nodes might not properly identify themselves on the mesh network, causing communication issues.
+_____________________________________________________________________________________________________________________________________________________________
 
 How to Use:
 
@@ -337,6 +337,14 @@ ________________________________________________________________________________
 
 When to Use: Only modify this setting if you're experiencing issues with your node not being able to send or receive messages correctly. It helps ensure that your node is always using the correct node ID.
 
+
+_____________________________________________________________________________________________________________________________________________________________
+
+
+
+use_mesh_interface Explanation:
+
+"use_mesh_interface": false, (can be set to true) bypasses the typical seial connection and relies on newer features in meshtastic firmware to retrieve and send messages.  This has been buggy thus far, and remains disabled by default - but should be working in future versions.
 
 _____________________________________________________________________________________________________________________________________________________________
 
