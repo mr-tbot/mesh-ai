@@ -86,6 +86,10 @@ ________________________________________________________________________________
 
 Configuration
 
+PLEASE NOTE - CERTAIN SETTINGS CAN ONLY BE ACCESS BY EDITING "meshtastic_ai.py" DIRECTLY - including COM PORT NUMBER, PROMPT, ETC...  TAKE A LOOK.
+
+Exposing more options in configuration is high on the priority list.  Stay tuned.
+
 config.json
 The configuration file allows you to adjust various settings, including the AI service configuration, chunking parameters, and emergency alert settings.
 
