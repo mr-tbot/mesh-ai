@@ -373,7 +373,7 @@ ________________________________________________________________________________
 
 use_mesh_interface Explanation:
 
-"use_mesh_interface": false, (can be set to true) bypasses the typical seial connection and relies on newer features in meshtastic firmware to retrieve and send messages.  This has been buggy thus far, and remains disabled by default - but should be working in future versions.
+"use_mesh_interface": false, (can be set to true) bypasses the typical serial connection and relies on newer features in meshtastic firmware to retrieve and send messages.  This has been buggy thus far, and remains disabled by default - but should be working in future versions.
 
 _____________________________________________________________________________________________________________________________________________________________
 
