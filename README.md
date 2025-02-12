@@ -420,7 +420,7 @@ ________________________________________________________________________________
 
 
 The bot will start and run in the background, listening for messages and commands on your connected Meshtastic node.
-The Flask web interface will be available at http://localhost:5000. You can use it to view recent messages and interact with the bot via HTTP.
+The Flask web interface will be available at http://localhost:5000/dashboard. You can use it to view recent messages and interact with the bot via HTTP.
 
 _____________________________________________________________________________________________________________________________________________________________
 
