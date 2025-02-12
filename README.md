@@ -1,5 +1,6 @@
-                                                        Meshtastic-AI: Off-Grid AI Chat Bot - ALPHA v0.1 - THE FIRST PUBLIC RELEASE!
-                                                                                  Overview
+Meshtastic-AI: Off-Grid AI Chat Bot - ALPHA v0.1 - THE FIRST PUBLIC RELEASE!
+
+Overview
 
 Meshtastic-AI is an open-source project designed to integrate AI with Meshtastic nodes for off-grid communication. The bot listens for direct messages from users or /commands in the mesh network and responds by relaying information from LMStudio API (OpenAI and ollama coming soon). This allows users to interact with the system, ask questions, and receive AI-generated responses—even in remote areas without internet access.
 
@@ -14,7 +15,7 @@ Serial Mode Tools: Additional Python scripts for automating the enabling of seri
 
 _____________________________________________________________________________________________________________________________________________________________
 
-                                                                              Key Features:
+Key Features:
 
 - AI-Driven Responses: Relays messages to an AI service like LMStudio or OpenAI (coming soon) for generating intelligent responses.
 - Command Handling: Listens for specific commands in the mesh network, such as /ai, /whereami, or /emergency, and responds accordingly.
@@ -24,8 +25,9 @@ ________________________________________________________________________________
 
 _____________________________________________________________________________________________________________________________________________________________
 
-                                                                                How It Works
-                                                                    Message Handling and Command Response
+How It Works
+Message Handling and Command Response
+
 The script is designed to listen for two types of messages:
 
 Direct Messages: 
@@ -38,7 +40,7 @@ These are commands sent in channels where the node is active. Commands such as /
 
 _____________________________________________________________________________________________________________________________________________________________
 
-                                                                              The AI Service:
+The AI Service:
 
 The bot integrates with LMStudio or (soon) OpenAI APIs. When the bot receives a question or query, it forwards this to the configured AI service. It processes the response and sends it back to the mesh network, allowing users to receive intelligent answers, even without internet access.  Any model can be useed - as this script only acts as a forarder between the LMStudio or OpenAI API and the Meshtastic Network...  So - tailored models can be used in various situations...  You could have a model that is specifically for assistance or data or a model that just cracks jokes - you could even have a model that role plays while you are out playing airsoft - for example.
 
@@ -71,7 +73,8 @@ Why Client_Mute Mode?: Other modes may send additional messages that could inter
 _____________________________________________________________________________________________________________________________________________________________
 
 
-                                                                        Configuration
+Configuration
+
 config.json
 The configuration file allows you to adjust various settings, including the AI service configuration, chunking parameters, and emergency alert settings.
 
@@ -118,7 +121,7 @@ ________________________________________________________________________________
 _____________________________________________________________________________________________________________________________________________________________
 
 
-                                                                        Channel /Slash Commands
+Channel /Slash Commands
 
 Meshtastic-AI listens for the following built-in commands:
 
@@ -163,17 +166,17 @@ MOTD Customization: The message of the day (MOTD) can be changed by modifying th
 _____________________________________________________________________________________________________________________________________________________________
 
 
-                                                                           Emergency Alerts (untested at this time)
+Emergency Alerts (untested at this time)
 
 If enabled in config.json, Meshtastic-AI can send SMS and Email alerts for emergencies via Twilio and SMTP. Ensure that the necessary credentials and recipient information are provided in the config file.
 
-                                                                               ***** FIRST DISCLAIMER *****
+***** FIRST DISCLAIMER *****
 
 The machine running this script MUST have an internet connection to send SMS or Email Emergency alerts.  This feature currently remains UNTESTED - and should not be depended upon in a true emergency situation at this time!  If your goal is a totally offline, off grid implementation of LMStudio - please be aware that offline emergency alerts ARE NOT AVAILABLE AT THIS TIME.  There will be a way to turn off the feature entirely in future versions.
 
 _____________________________________________________________________________________________________________________________________________________________
 
-                                                                         Offline / Off-Grid LMStudio Integration
+Offline / Off-Grid LMStudio Integration
 
 For the offline AI functionality to work, LMStudio must be running and its web server active. The address of the server can be configured in the config.json file under lmstudio_url. This bot acts as a man-in-the-middle, forwarding the messages to LMStudio, which processes the input and returns the generated responses.
 
@@ -181,7 +184,7 @@ The AI can run any model, and the bot will handle passing and decoding the seria
 
 _____________________________________________________________________________________________________________________________________________________________
 
-                                                                                Flask Web Interface
+Flask Web Interface
 
 The bot exposes the following web API:
 
@@ -191,7 +194,8 @@ POST /send: Sends a message to a specified node in the mesh.
 
 _____________________________________________________________________________________________________________________________________________________________
 
-                                                                                   Running the Bot
+Running the Bot
+
 To run the bot:
 Navigate using terminal or CMD to your installation directory & run the following:
 _____________________________________________________________________________________________________________________________________________________________
@@ -205,7 +209,8 @@ This will start the bot and expose the Flask web API on http://localhost:5000.
 
 _____________________________________________________________________________________________________________________________________________________________
 
-                                                                            Features Coming Soon:
+Features Coming Soon:
+
 - OpenAI API Integration - actively in development.
 - Ollama API Options (though LMStudio is far superior).
 - Discord Webhook Publishing.
@@ -215,7 +220,8 @@ ________________________________________________________________________________
 
 _____________________________________________________________________________________________________________________________________________________________
 
-                                                                              Installation Guide
+Installation Guide
+
 Prerequisites
 
 Before starting the installation, make sure you have the following:
@@ -297,7 +303,8 @@ lmstudio_url: Set the URL of the LMStudio API server. Example:
 
 
 
-                                                                        force_node_num Explanation
+force_node_num Explanation:
+
 "force_node_num" is an optional setting in the config.json file.
 
 Purpose: This option was implemented in case your Meshtastic node is having trouble sending or receiving messages. Sometimes, nodes might not properly identify themselves on the mesh network, causing communication issues.
