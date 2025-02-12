@@ -239,6 +239,7 @@ Features Coming Soon:
 - Discord Webhook Publishing.
 - Further Web Dashboard Development.
 - Emergency Alert Field Testing and improvements
+- The ability to send short custom Twillo SMS or SMTP messages to any phone or email address rather than just the emergency number.
 - Further configuration options TBD.
 
 _____________________________________________________________________________________________________________________________________________________________
