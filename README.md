@@ -15,11 +15,9 @@
   - Built-in commands: `/ping`, `/test`, `/help`, `/motd`, `/ai`, `/emergency`, `/whereami`, plus custom commands via `commands_config.json`.
 - **Emergency Alerts**  
   - Send SMS or email (via Twilio / SMTP) or Discord webhook when `/emergency` is triggered.  
-- **Message Chunking**  
-  - Large AI responses are split into smaller pieces, so you don’t overwhelm the LoRa network.
 - **REST API**  
   - A built-in Flask server to read logs (`/messages`), see a web-based dashboard (`/dashboard`), or programmatically send messages (`/send`).
-- **Response Chunking and token logic**  
+- **Message Chunking & Token Logic**  
   - Automatically chunks AI responses into multiple messages with delays to reduce strain on the mesh network & respect radio duty cycles - logic in the code automatically calculates maximum token usage for the AI API to avoid response truncation.
 - **Windows-Focused**  
   - This version officially supports Windows. Linux & Mac support is planned for a future release.
