@@ -16,7 +16,7 @@
 - **Emergency Alerts**  
   - Send SMS or email (via Twilio / SMTP) or Discord webhook when `/emergency` is triggered.  
 - **REST API**  
-  - A built-in Flask server to read logs (`/messages`), see a web-based dashboard (`/dashboard`), or programmatically send messages (`/send`).
+  - A built-in Flask server to read logs (`/messages`), see a web-based dashboard (`/dashboard`), or programmatically send messages (`/send`).  (MAJOR DASHBOARD UI UPDATE COMING IN ALPHA v0.3.0 - currently in progress!!!)
 - **Message Chunking & Token Logic**  
   - Automatically chunks AI responses into multiple messages with delays to reduce strain on the mesh network & respect radio duty cycles - logic in the code automatically calculates maximum token usage for the AI API to avoid response truncation.
 - **Windows-Focused**  
