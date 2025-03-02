@@ -1,11 +1,3 @@
-
-███╗   ███╗███████╗███████╗██╗  ██╗████████╗ █████╗ ███████╗████████╗██╗ ██████╗  █████╗ ██╗
-████╗ ████║██╔════╝██╔════╝██║  ██║╚══██╔══╝██╔══██╗██╔════╝╚══██╔══╝██║██╔════╝ ██╔══██╗██║
-██╔████╔██║█████╗  ███████╗███████║   ██║   ███████║███████╗   ██║   ██║██║█████╗███████║██║
-██║╚██╔╝██║██╔══╝  ╚════██║██╔══██║   ██║   ██╔══██║╚════██║   ██║   ██║██║╚════╝██╔══██║██║
-██║ ╚═╝ ██║███████╗███████║██║  ██║   ██║   ██║  ██║███████║   ██║   ██║╚██████╗ ██║  ██║██║
-╚═╝     ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚═╝
-                                                                                            
 # Meshtastic-AI (Alpha v0.2.2)
 
 **Meshtastic-AI** is an experimental project that adds AI chatbot and extended features to your [Meshtastic](https://meshtastic.org) LoRa mesh network. It allows you to interact with a conversational AI offline (via local models) or online (via OpenAI), integrates with Home Assistant, can send emergency alerts, and is highly configurable through JSON.
