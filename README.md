@@ -1,172 +1,232 @@
-Meshtastic-AI: Off-Grid AI Chat Bot - ALPHA v0.1 - THE FIRST PUBLIC RELEASE!
 
-Overview
+███╗   ███╗███████╗███████╗██╗  ██╗████████╗ █████╗ ███████╗████████╗██╗ ██████╗  █████╗ ██╗
+████╗ ████║██╔════╝██╔════╝██║  ██║╚══██╔══╝██╔══██╗██╔════╝╚══██╔══╝██║██╔════╝ ██╔══██╗██║
+██╔████╔██║█████╗  ███████╗███████║   ██║   ███████║███████╗   ██║   ██║██║█████╗███████║██║
+██║╚██╔╝██║██╔══╝  ╚════██║██╔══██║   ██║   ██╔══██║╚════██║   ██║   ██║██║╚════╝██╔══██║██║
+██║ ╚═╝ ██║███████╗███████║██║  ██║   ██║   ██║  ██║███████║   ██║   ██║╚██████╗ ██║  ██║██║
+╚═╝     ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚═╝
+                                                                                            
+# Meshtastic-AI (Alpha v0.2.2)
 
-Meshtastic-AI is an open-source project designed to integrate AI with Meshtastic nodes for off-grid AI responses. The bot listens for direct messages from users or /commands in the mesh network and responds by relaying information from LMStudio API (OpenAI and ollama coming soon). This allows users to interact with the system, ask questions, and receive AI-generated responses—even in remote areas without internet access.
+**Meshtastic-AI** is an experimental project that adds AI chatbot and extended features to your [Meshtastic](https://meshtastic.org) LoRa mesh network. It allows you to interact with a conversational AI offline (via local models) or online (via OpenAI), integrates with Home Assistant, can send emergency alerts, and is highly configurable through JSON.
 
-Unlike traditional messaging systems, Meshtastic-AI does not focus on sending and receiving general messages across the mesh network. Instead, it serves as a bridge for off-grid questions and answers. It listens for direct messages or commands and uses an AI model to generate and send responses based on the query or command.
+> **Disclaimer:**  
+> This is **alpha software** and should **not** be relied upon for mission-critical or emergency use. It may be unstable or incomplete. Proceed with caution, and always have alternative communication methods available - modification of this code for nefarious purposes is strictly frowned upon.  Please use responsibly.
 
-This script has been successfully tested on Windows 11 - but will possibly work on Linux and MacOS operating systems with a little extra work.  Official Linux and MacOS support will come in time with community help.
+## Features
 
-Testing Hardware: This has been tested on Meshtastic 2.5.20 using a Heltec V3 board with LMStudio 0.3.9 Beta 6 on Windows 11.  OpenAI functionality remains broken for the time being - but will be implemented soon!
+- **Multiple AI Providers**  
+  - **Local (LM Studio, Ollama)** or **OpenAI** for GPT-based responses.
+- **Home Assistant Integration**  
+  - Redirect entire chat channels to your Home Assistant conversation API, optionally protected with a PIN.
+- **Slash Commands**  
+  - Built-in commands: `/ping`, `/test`, `/help`, `/motd`, `/ai`, `/emergency`, `/whereami`, plus custom commands via `commands_config.json`.
+- **Emergency Alerts**  
+  - Send SMS or email (via Twilio / SMTP) or Discord webhook when `/emergency` is triggered.  
+- **Message Chunking**  
+  - Large AI responses are split into smaller pieces, so you don’t overwhelm the LoRa network.
+- **REST API**  
+  - A built-in Flask server to read logs (`/messages`), see a web-based dashboard (`/dashboard`), or programmatically send messages (`/send`).
+- **Response Chunking and token logic**  
+  - Automatically chunks AI responses into multiple messages with delays to reduce strain on the mesh network & respect radio duty cycles - logic in the code automatically calculates maximum token usage for the AI API to avoid response truncation.
+- **Windows-Focused**  
+  - This version officially supports Windows. Linux & Mac support is planned for a future release.
+  
+## 1. Changelog: v0.1 → v0.2.2
 
-Serial Mode Tools: Additional Python scripts for automating the enabling of serial mode will be included in the release.  These were paramount in helping me get this working initially - and others might find some benefit in them.
+Below is a high-level overview of the most notable changes and additions since the v0.1 release.
 
+1. **Expanded Configuration & JSON Files**  
+   - **New `config.json` fields**  
+     - Added `debug` toggle for verbose debugging.  
+     - Added options for multiple AI providers (`lmstudio`, `openai`, `ollama`), including timeouts and endpoints.  
+     - Introduced **Home Assistant** integration toggles (`home_assistant_enabled`, `home_assistant_channel_index`, secure pin, etc.).  
+     - Implemented **Twilio** and **SMTP** settings for emergency alerts (including phone number, email, and credentials).  
+     - Added **Discord** webhook configuration toggles (e.g., `enable_discord`, `discord_send_emergency`, etc.).  
+     - Several new user-configurable parameters to control message chunking (`chunk_size`, `max_ai_chunks`, and `chunk_delay`) to reduce radio congestion.  
 
-_____________________________________________________________________________________________________________________________________________________________
+2. **Support for Multiple AI Providers**  
+   - **Local Language Models** (LM Studio, Ollama) and **OpenAI** (GPT-3.5, etc.) can be selected via `ai_provider`.  
+   - Behavior is routed depending on which provider you specify in `config.json`.
 
-Key Features:
+3. **Home Assistant Integration**  
+   - Option to route messages on a dedicated channel directly to Home Assistant’s conversation API.  
+   - **Security PIN** requirement can be enabled, preventing unauthorized control of Home Assistant.  
 
-- AI-Driven Responses: Relays messages to an AI service like LMStudio or OpenAI (coming soon) for generating intelligent responses.
-- Command Handling: Listens for specific commands in the mesh network, such as /ai, /whereami, or /emergency, and responds accordingly.
-- Message Chunking: Implements chunked message delivery to avoid congestion and maximize the effective use of the limited radio bandwidth on the mesh network.
-- Emergency Alerts: Provides functionality for sending emergency SMS or email alerts through Twilio and SMTP.
-- Web Interface: Exposes a simple web dashboard for viewing messages and managing the system via HTTP.
+4. **Improved Command Handling**  
+   - Replaced single-purpose code with a new, flexible **commands system** loaded from `commands_config.json`.  
+   - Users can define custom commands that either have direct string responses or prompt an AI.  
+   - Built-in commands now include `/ping`, `/test`, `/emergency`, `/whereami`, `/help`, `/motd`, and more.  
 
-_____________________________________________________________________________________________________________________________________________________________
+5. **Emergency Alert System**  
+   - `/emergency` (or `/911`) triggers optional Twilio SMS, SMTP email, and/or Discord alerts.  
+   - Retrieves node GPS coordinates (if available) to include location in alerts.  
 
-How It Works
-Message Handling and Command Response
+6. **Improved Message Chunking & Throttling**  
+   - Long AI responses are split into multiple smaller segments (configurable via `chunk_size` & `max_ai_chunks`).  
+   - Delays (`chunk_delay`) between chunks to avoid flooding the mesh network.  
 
-The script is designed to listen for two types of messages:
+7. **REST API Endpoints** (via built-in Flask server)  
+   - `GET /messages`: Returns the last 100 messages in JSON.  
+   - `GET /dashboard`: Displays a simple HTML dashboard showing the recently received messages.  
+   - `POST /send`: Manually send messages to nodes (direct or broadcast) from external scripts or tools.  
 
-Direct Messages: 
+8. **Improved Logging and File Structure**  
+   - **`messages.log`** for persistent logging of all incoming messages, commands, and emergencies.  
+   - Distinct JSON config files: `config.json`, `commands_config.json`, and `motd.json`.  
 
-These are messages sent directly to the node on the mesh network. When a user sends a direct message to the node (e.g., asking a question), the system forwards this message to an AI service for processing and then sends the AI’s response back to the requesting node.
+9. **Refined Startup & Script Structure**  
+   - A new `Run Mesh-AI - Windows.bat` script for straightforward Windows startup.  
+   - Added disclaimers for alpha usage throughout the code.  
+   - Streamlined reconnection and exception handling logic with more robust error-handling.  
 
-Slash Commands: 
+10. **General Stability & Code Quality Enhancements**  
+   - Thorough refactoring of the code to be more modular and maintainable.  
+   - Better debugging hooks, improved concurrency handling, and safer resource cleanup.  
 
-These are commands sent in channels where the node is active. Commands such as /ai, /whereami, and /emergency are interpreted by the system, and based on the command, an appropriate response is generated and sent back to the channel or directly to the user.
-
-_____________________________________________________________________________________________________________________________________________________________
-
-The AI Service:
-
-The bot integrates with LMStudio or (soon) OpenAI APIs. When the bot receives a question or query, it forwards this to the configured AI service. It processes the response and sends it back to the mesh network, allowing users to receive intelligent answers, even without internet access.  Any model can be used - as this script only acts as a forwarder between the LMStudio or OpenAI API and the Meshtastic Network...  So - tailored models can be used in various situations...  You could have a model that is specifically for assistance or data or a model that just cracks jokes - you could even have a model that role plays while you are out playing airsoft - for example.
-
-
-Chunking and Network Optimization
-
-Since Meshtastic operates on a low bandwidth, limited duty cycle, especially in areas with regulatory restrictions (e.g., Europe’s 10% duty cycle limit), it is crucial to minimize congestion on the network.
-
-Meshtastic-AI uses message chunking to break long responses into smaller pieces, ensuring that each message is transmitted efficiently without overloading the network. These chunks are sent with a delay between each to ensure that the system adheres to Meshtastic’s duty cycle limitations.
-
-Chunk Size and Delay: 
-
-You can adjust the chunk size, maximum number of chunks, and delay between chunks in the config.json file:
-
-- chunk_size: Defines the maximum size of each chunk of a message.
-
-- max_ai_chunks: Limits the maximum number of chunks to send for a single message.
-
-- chunk_delay: Sets a delay (in seconds) between sending each chunk to prevent network congestion.
-
-Maximum Token Calculation for LMStudio
-
-To reduce the risk of truncated AI responses, Meshtastic-AI automatically calculates the maximum number of tokens for LMStudio based on the chunk size and number of chunks. This ensures that responses from the AI are as complete as possible while adhering to the token limit. The token limit is calculated as:
-
-_____________________________________________________________________________________________________________________________________________________________
-
-// MAX_RESPONSE_LENGTH = chunk_size * max_ai_chunks
-
-_____________________________________________________________________________________________________________________________________________________________
-
-This calculated length determines how much text the system can send in a single response, optimizing the balance between message size and token limits to avoid truncation.
-
-_____________________________________________________________________________________________________________________________________________________________
-
-
-Client Mode
-The node running the system should be in "Client_Mute" mode to maximize the AI response efficiency. In this mode, the node does not send unnecessary beacons or forward other messages, leaving more of the duty cycle available for AI response transmissions.
-
-Why Client_Mute Mode?: Other modes may send additional messages that could interfere with the timely delivery of responses. This is especially important in areas where the duty cycle is limited (e.g., in Europe, where the duty cycle is 10%). Testing has shown that placing the node in Client_Mute mode ensures that most of the duty cycle is available for responding to AI queries.
-
-_____________________________________________________________________________________________________________________________________________________________
+---
 
 
-Configuration
+## Quick Start (Windows)
 
-PLEASE NOTE - CERTAIN SETTINGS CAN ONLY BE ACCESS BY EDITING "meshtastic_ai.py" DIRECTLY - including COM PORT NUMBER, PROMPT, ETC...  TAKE A LOOK.
+1. **Download / Clone** this repository or place the **meshtastic-ai** folder on your Desktop.  
+2. **Install Dependencies** (see [Installation Guide](#installation-guide) below for details).  
+3. **Configure** `config.json` and other `.json` files as needed.  
+4. **Double-click** `Run Mesh-AI - Windows.bat`.  
+5. Meshtastic-AI will launch the Flask server and try to connect to your Meshtastic device over Serial or TCP.  
+6. Once connected, open a terminal (or your Meshtastic device) and send commands like `/ping` or `/ai hello!`  
+7. (Optional) Visit [http://localhost:5000/dashboard](http://localhost:5000/dashboard) to see the built-in dashboard.
 
-Exposing more options in configuration is high on the priority list.  Stay tuned.
+## Basic Usage
 
-config.json
-The configuration file allows you to adjust various settings, including the AI service configuration, chunking parameters, and emergency alert settings.
+- **Talk to the AI:**  
+  - Send a direct message to the AI node (or a recognized shortName) using `/ai`, or just DM it if configured.  
+  - Example: `/ai Hello, how are you?`
+- **Check your location:**  
+  - `/whereami` attempts to print your GPS coordinates (if your node has them).
+- **Emergency Alerts:**  
+  - Send `/emergency <message>` to trigger Twilio SMS/Email/Discord notifications (if configured).
+- **Home Assistant:**  
+  - If enabled, any message on the designated channel index is forwarded to Home Assistant’s conversation. If a PIN is required, include `PIN=XXXX` in the message.
 
-- lmstudio_url: The URL of the LMStudio API server. Default: "http://localhost:1234/v1/chat/completions".
-- lmstudio_timeout: The timeout for AI requests. Default: 60 seconds.
-- chunk_size: The size of each chunk of a message. Default: 200 characters.
-- max_ai_chunks: The maximum number of chunks allowed for a single message. Default: 4.
-- chunk_delay: The delay between sending each chunk. Default: 10 seconds.
-- local_location_string: The string identifying the location of the node. Default: "on the mesh".
-- ai_node_name: The name of the AI node. Default: "Mesh-AI-Alpha".
-- force_node_num: Optionally override the node number. Default: null.
-- enable_twilio: Whether to enable Twilio SMS notifications. Default: false.
-- enable_smtp: Whether to enable SMTP email notifications. Default: false.
+---
 
-_____________________________________________________________________________________________________________________________________________________________
+## 3. Installation Guide
 
-// Example config.json (default settings):
+Below is a detailed guide for setting up **Meshtastic-AI Alpha v0.2.2** on Windows.
 
+### A) Prerequisites
+
+1. **Python 3.9+**  
+   - Install from [python.org](https://www.python.org/downloads/) or confirm Python 3.9+ is on your system.  
+   - Make sure to check “Add Python to PATH” during installation.
+
+2. **Meshtastic Device**  
+   - A working Meshtastic node with either a USB serial connection or a WiFi/TCP interface (ESP32-based devices) on the same network.
+
+3. **Dependencies**  
+   - The main Python dependencies are listed in `requirements.txt`. They include:  
+     - `meshtastic==2.5.12`  
+     - `requests`  
+     - `Flask`  
+     - `twilio` (for SMS)  
+     - `pubsub`  
+     - etc.  
+
+### B) Download & Folder Setup
+
+1. **Obtain the Source**  
+   - Either clone the [GitHub repository](https://github.com/mr-tbot/meshtastic-ai) or copy the **meshtastic-ai** folder to your Desktop.  
+2. **(Recommended) Create a Virtual Environment**  
+   ```bash
+   cd path\to\meshtastic-ai
+   python -m venv venv
+   venv\Scripts\activate
+   ```
+3. **Install Requirements**  
+   ```bash
+   pip install --upgrade pip
+   pip install -r requirements.txt
+   ```
+
+### C) Configure `config.json`
+
+Open `config.json` in any text editor. Below is a breakdown of important fields (this is only a partial list—see file for all):
+
+```json
 {
   "debug": false,
   "use_mesh_interface": false,
+  "use_wifi": true,
+  "wifi_host": "YOUR_MESHTASTIC_NODE_IP",
+  "wifi_port": 4403,
+
+  "serial_port": "",
+  "ai_provider": "lmstudio",
+  "system_prompt": "You are a helpful assistant responding to mesh network chats.",
+
   "lmstudio_url": "http://localhost:1234/v1/chat/completions",
   "lmstudio_timeout": 60,
+
+  "openai_api_key": "YOUR_OPENAI_API_KEY",
+  "openai_model": "gpt-3.5-turbo",
+  "openai_timeout": 30,
+
+  "ollama_url": "http://localhost:11434/api/generate",
+  "ollama_model": "llama3",
+  "ollama_timeout": 60,
+
+  "home_assistant_url": "http://YOUR_HOME_ASSISTANT_URL:8123/api/conversation/process",
+  "home_assistant_token": "YOUR_HOME_ASSISTANT_BEARER_TOKEN",
+  "home_assistant_timeout": 60,
+  "home_assistant_enable_pin": false,
+  "home_assistant_secure_pin": "1234",
+
+  "home_assistant_enabled": false,
+  "home_assistant_channel_index": 6,
+
   "chunk_size": 200,
   "max_ai_chunks": 4,
   "chunk_delay": 10,
-  "local_location_string": "on the mesh",
-  "ai_node_name": "Mesh-AI-Alpha",
+  "local_location_string": "YourLocationStringHere",
+  "ai_node_name": "Mesh-AI-Node",
   "force_node_num": null,
+
   "enable_twilio": false,
-  "enable_smtp": false,
-  "alert_phone_number": "+15555555555",
-  "twilio_sid": "ACXXXX",
-  "twilio_auth_token": "XXXX",
-  "twilio_from_number": "+14444444444",
-  "smtp_host": "smtp.gmail.com",
-  "smtp_port": 587,
-  "smtp_user": "myemail@gmail.com",
-  "smtp_pass": "mypassword",
-  "alert_email_to": "emergency@recipient.com"
+  "enable_smtp": true,
+  ...
 }
+```
 
+Key points:
 
-_____________________________________________________________________________________________________________________________________________________________
+- **`debug`**  
+  - Set to `true` for verbose logs in the console.
+- **Connection Options**  
+  - **`use_wifi`** & `wifi_host`: Enable if you have a WiFi-enabled Meshtastic device.  
+  - **`serial_port`**: If you prefer USB direct connection (Windows often uses something like `COM3`). Leave blank to auto-detect.
+- **AI Provider**  
+  - `"ai_provider": "lmstudio"`: Uses a local LLM via LM Studio.  
+  - `"ai_provider": "openai"`: Routes user queries to the OpenAI API (requires `openai_api_key`).  
+  - `"ai_provider": "ollama"`: Uses a local LLaMA-based server.  
+- **Home Assistant**  
+  - **`home_assistant_enabled`**: Whether to enable routing.  
+  - **`home_assistant_channel_index`**: The channel index that triggers Home Assistant.  
+  - **`home_assistant_enable_pin`**: If `true`, messages must include `PIN=XXXX` to be passed to Home Assistant.  
+- **Message Chunking**  
+  - `chunk_size` and `max_ai_chunks`: Controls how messages are split to avoid overwhelming the LoRa network.  
+  - `chunk_delay`: Delay (in seconds) between sending each chunk.  
+- **Emergency Settings** (Email or Twilio)  
+  - **`enable_twilio`** / **`enable_smtp`** toggles.  
+  - Fill in Twilio or SMTP credentials if you want to use them for `/emergency`.  
+- **Discord Settings**  
+  - `enable_discord` and `discord_webhook_url` to forward messages or emergencies to Discord.
 
+### D) Configure `commands_config.json`
 
-Channel /Slash Commands
+This file defines custom slash commands. For example:
 
-Meshtastic-AI listens for the following built-in commands:
-
-/about: Information about the bot.
-
-/ai: Query the AI for a response.
-
-/whereami: Get the GPS coordinates of the current node.
-
-/emergency /911: Trigger an emergency alert (SMS/Email).
-
-/test: A simple test message.  Takes the senders shortcode name and generates a response to facilitate easier range testing on channels.
-
-/help: List available commands.
-
-/motd: Display the message of the day.
-
-****/commands are currently CASE SENSITIVE - this will be improved later.****
-
-These commands will respond on any channel the node attached to the machine is a member of - including LongFast.  The /commands feature is not only there to 
-enable functionality, but also to prevent spamming by the AI.  Future versions MAY allow for free communication on specific channels - but in an effort to prevent overwhelming the meshtastic network and AI generated SPAM - these features will currently remain limited.  -  
-
-We can only hope people use this technology for good - it is not my intention for this to be used for evil...  but there is always that chance.
-
-Custom commands can be defined in the commands_config.json file.
-
-Example of Custom Commands Configuration:
-
-_____________________________________________________________________________________________________________________________________________________________
-
+```json
 {
   "commands": [
     {
@@ -176,259 +236,144 @@ ________________________________________________________________________________
     {
       "command": "/weather",
       "response": "Currently, local weather is unknown. (This is a placeholder.)"
+    },
+    {
+      "command": "/funfact",
+      "ai_prompt": "Give me a fun fact about {user_input}"
     }
   ]
 }
+```
+
+- **`command`**: The slash command text, e.g. `/funfact`.  
+- **`response`**: A static string to return immediately.  
+- **`ai_prompt`**: A dynamic AI-based command, combining the user’s input into the prompt.  
+
+### E) Configure `motd.json`
 
-_____________________________________________________________________________________________________________________________________________________________
+Contains a simple string displayed by `/motd`:
+
+```json
+"Welcome to the Meshtastic AI Chat Bot by MR-TBOT.COM! Enjoy your stay off the grid."
+```
+
+You can edit this text to change the “Message of the Day.”
+
+### F) Running the Bot
+
+1. **Double-click** `Run Mesh-AI - Windows.bat` in the main folder.  
+2. A console window will appear, showing logs and attempt to connect to your Meshtastic device.  
+3. After successful connection, you should see:
+
+   ```
+   Starting Meshtastic-AI server...
+   Launching Flask in the background on port 5000...
+   Attempting to connect to Meshtastic device...
+   ...
+   Subscribing to on_receive callback...
+   Connection successful. Running until error or Ctrl+C.
+   ```
 
-MOTD Customization: The message of the day (MOTD) can be changed by modifying the motd.json file.
+4. **Test** by sending messages on your Meshtastic device. For instance, send `/ping` or `/test` from your node.  
+5. Optionally, open [http://localhost:5000/dashboard](http://localhost:5000/dashboard) in your browser to see recent messages.
 
-_____________________________________________________________________________________________________________________________________________________________
+---
 
+## 4. Using the API
 
-Emergency Alerts (untested at this time)
+Meshtastic-AI starts a local **Flask** server on port **5000** by default. Three main endpoints exist:
 
-If enabled in config.json, Meshtastic-AI can send SMS and Email alerts for emergencies via Twilio and SMTP. Ensure that the necessary credentials and recipient information are provided in the config file.
+1. **GET `/messages`**  
+   - Returns the most recent 100 messages in JSON format.  
+   - Example:
+     ```bash
+     curl http://localhost:5000/messages
+     ```
 
-***** FIRST DISCLAIMER *****
+2. **GET `/dashboard`**  
+   - Shows a simple HTML page with the latest messages.
 
-The machine running this script MUST have an internet connection to send SMS or Email Emergency alerts.  This feature currently remains UNTESTED - and should not be depended upon in a true emergency situation at this time!  If your goal is a totally offline, off grid implementation of LMStudio - please be aware that offline emergency alerts ARE NOT AVAILABLE AT THIS TIME.  There will be a way to turn off the feature entirely in future versions.
+3. **POST `/send`**  
+   - Allows you to send messages from external scripts or other services to the mesh.  
+   - Expects JSON:  
+     ```json
+     {
+       "message": "Hello from API!",
+       "node_id": "!433e231c",
+       "channel_index": 0,
+       "direct": false
+     }
+     ```
+   - `node_id` can be a hex-based Meshtastic ID (like `!433e231c`) or a broadcast address.  
+   - `channel_index` is optional (defaults to 0).  
+   - `direct` can be `true` for direct messages or `false` for a broadcast.
 
-_____________________________________________________________________________________________________________________________________________________________
+---
 
-Offline / Off-Grid LMStudio Integration
+## 5. Home Assistant Integration
 
-For the offline AI functionality to work, LMStudio must be running and its web server active. The address of the server can be configured in the config.json file under lmstudio_url. This bot acts as a man-in-the-middle, forwarding the messages to LMStudio, which processes the input and returns the generated responses.
+1. **Enable**  
+   - In `config.json`, set `"home_assistant_enabled": true` and pick a `home_assistant_channel_index` that you want to dedicate to Home Assistant.  
 
-The AI can run any model, and the bot will handle passing and decoding the serial messages on the Meshtastic node, forwarding them to LMStudio, and then sending the AI's response to the sender node or the corresponding channel.
+2. **API Token & URL**  
+   - Provide your Home Assistant conversation URL in `home_assistant_url`, typically something like:  
+     ```
+     http://<YOUR-HA-IP>:8123/api/conversation/process
+     ```
+   - Include a valid token in `home_assistant_token`:  
+     ```json
+     "home_assistant_token": "YOUR_HOME_ASSISTANT_BEARER_TOKEN"
+     ```
+3. **PIN Protection (Optional)**  
+   - If `"home_assistant_enable_pin": true`, you must include `PIN=XXXX` in your chat messages, or Meshtastic-AI will refuse to relay them.  
+4. **Send Commands**  
+   - Any message on the configured channel (for instance, channel index 6) automatically routes to Home Assistant’s conversation engine.  
+   - The Home Assistant response is returned as text, which is forwarded back to your Meshtastic device.
 
-_____________________________________________________________________________________________________________________________________________________________
+---
 
-Flask Web Interface
+## 6. Supported LLM APIs
 
-The bot exposes the following web API:
+### A) LM Studio
+- **Local** large language models served by LM Studio at the URL in `lmstudio_url`.
+- `lmstudio_timeout` can be increased if your model is slow to respond.
 
-GET /messages: Returns a JSON feed of recent messages.
+### B) OpenAI
+- Provide your `openai_api_key`, set `"ai_provider": "openai"`, and specify the model name (`gpt-3.5-turbo`, etc.).
+- Keep an eye on your **API usage and costs**.
 
-GET /dashboard: Displays a simple HTML dashboard with recent messages.
+### C) Ollama
+- Another local LLM server. Specify `ollama_url` and `ollama_model`.
+- `ollama_timeout` is also configurable.
 
-POST /send: Sends a message to a specified node in the mesh.
+---
 
-_____________________________________________________________________________________________________________________________________________________________
+## 7. Disclaimers & Next Steps
 
-Running the Bot
+- **Alpha Software**  
+  - This version (v0.2.2) is still in **alpha**. Expect bugs, incomplete features, and potential instability.
+- **Not for Emergencies**  
+  - Do not depend solely on this system for any life-critical or mission-critical scenarios.  
+  - Always have backup communication methods available.
+- **Linux & macOS Support**  
+  - Currently, the packaged scripts are tailored to Windows. Linux/macos instructions will come soon.  
+- **Contributions**  
+  - If you find a bug or want to help, please open an issue on GitHub or submit a pull request.
 
-To run the bot:
-Navigate using terminal or CMD to your installation directory & run the following:
-_____________________________________________________________________________________________________________________________________________________________
+---
 
+## 8. Conclusion
 
-python meshtastic_ai.py
+By following this guide, you’ll have an **off-grid AI assistant** on your Meshtastic network, complete with custom slash commands, optional Home Assistant integration, and multiple AI backend choices. Enjoy tinkering with **Meshtastic-AI** and help shape its evolution by providing feedback on GitHub!
 
-_____________________________________________________________________________________________________________________________________________________________
+**Stay safe, and have fun!**
 
-This will start the bot and expose the Flask web API on http://localhost:5000.
+---
 
-_____________________________________________________________________________________________________________________________________________________________
+**End of Documentation**  
 
-Features Coming Soon:
+> **Thank you for using Meshtastic-AI Alpha v0.2.2!**  
 
-- OpenAI API Integration - actively in development.
-- Ollama API Options (though LMStudio is far superior).
-- Discord Webhook Publishing.
-- Further Web Dashboard Development.
-- Emergency Alert Field Testing and improvements
-- The ability to send short custom Twillo SMS or SMTP messages to any phone or email address rather than just the emergency number.
-- Further configuration options TBD.
+Please report any issues or ideas on the project’s GitHub.
 
-_____________________________________________________________________________________________________________________________________________________________
-
-Installation Guide
-
-Prerequisites
-
-Before starting the installation, make sure you have the following:
-
-- A Meshtastic Node (such as a Heltec V3 (currently only tested model) or similar).
-- A computer running Python 3.13 or higher (Windows, Linux, or Mac should work).
-- LMStudio should be running with its web server active. Your config.json should point to the LMStudio instance's address.
-- Twilio and SMTP credentials (optional, if you want emergency SMS and email alerts).
-- The USB Serial drivers for your node installed and it's COM port identified.  Currently the script works specifically on COM3 - but this setting will be exposed in config.json very soon.  If you need a different COM port - you can edit it easily in the meshtastic_ai.py script (as well as any other settings not currently exposed in the config.json) 
-
-_____________________________________________________________________________________________________________________________________________________________
-
-
-Step 1: Install Python 3.13+
-
-Ensure that Python 3.13 or higher is installed on your system.
-
-- Windows: Download from python.org.
-
-- (untested) Linux: Use your package manager (e.g., sudo apt install python3 on Ubuntu).
-
-- (untested) Mac: Use Homebrew (brew install python3) or download from python.org.
-
-After installing Python, verify the installation by running the following in your terminal or command prompt:
-
-_____________________________________________________________________________________________________________________________________________________________
-
-
-python --version
-
-_____________________________________________________________________________________________________________________________________________________________
-
-
-Download the latest release or Clone the Meshtastic-AI repository to your local machine. 
-
-You can find releases here - https://github.com/mr-tbot/meshtastic-ai/releases
-
-If you don't have Git installed, you can download it from git-scm.com.
-
-_____________________________________________________________________________________________________________________________________________________________
-
-git clone https://github.com/mr-tbot/meshtastic-ai.git
-cd meshtastic-ai
-
-_____________________________________________________________________________________________________________________________________________________________
-
-
-Step 3: Install Dependencies
-
-Navigate to the project folder and install the required dependencies. This is done using Python’s package manager, pip.
-
-Open your terminal (or command prompt).
-Run the following command inside the meshtastic-ai directory:
-
-_____________________________________________________________________________________________________________________________________________________________
-
-
-pip install -r requirements.txt
-
-_____________________________________________________________________________________________________________________________________________________________
-
-
-This will install all the necessary Python libraries for the bot to function, including Meshtastic, Flask, requests, and others.
-
-_____________________________________________________________________________________________________________________________________________________________
-
-
-Step 4: Configure config.json
-
-The config.json file contains settings for the AI model, chunking parameters, and emergency alerts. Modify this file to match your setup:
-
-Open the config.json file in a text editor.
-
-Configure the following settings:
-
-lmstudio_url: Set the URL of the LMStudio API server. Example:
-
-"lmstudio_url": "http://localhost:1234/v1/chat/completions"
-
-- chunk_size, max_ai_chunks, chunk_delay: Adjust these parameters for optimal chunking based on your network conditions.
-
-- If you're enabling Twilio or SMTP for emergency alerts, ensure you provide the correct credentials.
-
-- Set the local_location_string and ai_node_name to reflect your desired node settings.
-
-_____________________________________________________________________________________________________________________________________________________________
-
-force_node_num explaination
-
-"force_node_num" is an optional setting in the config.json file.  This option was implemented in case your Meshtastic node is having trouble sending or receiving messages. Sometimes, nodes might not properly identify themselves on the mesh network, causing communication issues.  This forces the script to identify and decode messages meant for the node attached to your machine via USB - and sometimes nodes do not proerly announce their node-ID over serial to the script.  At least in Alpha - you will likely need to set this.
-
-_____________________________________________________________________________________________________________________________________________________________
-
-How to Use:
-
-If you're facing communication problems, you can set a specific node number for your node to ensure it is properly identified.
-
-To get your node number, run the following command in your terminal or command prompt:
-
-_____________________________________________________________________________________________________________________________________________________________
-
-
-meshtastic --info
-
-_____________________________________________________________________________________________________________________________________________________________
-
-
-This will display information about your connected Meshtastic device, including its 9 digit node ID number.
-
-Example: If the command gives you a node number like 123456789, you can enter it like this in config.json:
-
-_____________________________________________________________________________________________________________________________________________________________
-
-
-"force_node_num": 123456789
-
-_____________________________________________________________________________________________________________________________________________________________
-
-
-When to Use: Only modify this setting if you're experiencing issues with your node not being able to send or receive messages correctly. It helps ensure that your node is always using the correct node ID.  This number changes on factory resets - and hopefully the issues i've had with auto-identifying the node-ID in some cases is resolved in the future...  For now, this is the way.
-
-
-_____________________________________________________________________________________________________________________________________________________________
-
-
-
-use_mesh_interface Explanation:
-
-"use_mesh_interface": false, (can be set to true) bypasses the typical serial connection and relies on newer features in meshtastic firmware to retrieve and send messages.  This has been buggy thus far, and remains disabled by default - but should be working in future versions.
-
-_____________________________________________________________________________________________________________________________________________________________
-
-
-
-Step 5: Configure motd.json
-
-To customize the Message of the Day (MOTD), edit the motd.json file.
-
-_____________________________________________________________________________________________________________________________________________________________
-
-
-
-Step 6: Set the Meshtastic Node to "Client_Mute" Mode
-
-To make sure the node is not sending unnecessary beacons and using the duty cycle efficiently:
-
-Put the Meshtastic node into "Client_Mute" mode. This mode allows your node to respond more efficiently by not broadcasting extra messages.
-You can typically set this in the Meshtastic app or via the node's configuration commands.
-Note: This step is especially important for areas where the duty cycle is limited, like in Europe, where the duty cycle is restricted to 10%.
-
-IMPORTANT: while your node is connected via serial it will not be able to respond to your Meshtastic phone app for updating settings.  You must unplug and (if you have a battery installed) reboot your device before you will be able to load or change settings via the meshtastic phone app...  afterwards simply reconnect the node to your PC and restart the meshtastic_ai.py script.
-
-_____________________________________________________________________________________________________________________________________________________________
-
-
-Step 7: Run LMStudio - OpenAI and ollama coming soon!
-
-Ensure that LMStudio is running on your machine and that its web server is active. The bot will rely on this server to generate AI responses. Set the lmstudio_url in config.json to the correct address of your running LMStudio instance.  Ensure your firewall and settings allows for LMStudio to function properly...  I won't go into setting up LMStudio - there are lots of resources on that topic.
-
-_____________________________________________________________________________________________________________________________________________________________
-
-
-Step 8: Run the Bot
-With everything configured, it’s time to run the bot. In your terminal, execute the following in your terminal from the installation directory:
-
-_____________________________________________________________________________________________________________________________________________________________
-
-
-python meshtastic_ai.py
-
-_____________________________________________________________________________________________________________________________________________________________
-
-
-The bot will start and run in the background, listening for messages and commands on your connected Meshtastic node.
-The Flask web interface will be available at http://localhost:5000/dashboard. You can use it to view recent messages and interact with the bot via HTTP.
-
-_____________________________________________________________________________________________________________________________________________________________
-
-
-MOTD Customization: The message of the day (MOTD) can be changed by modifying the motd.json file.
-
-_____________________________________________________________________________________________________________________________________________________________
-
-***Early Alpha: This is an early alpha release. The SMS and SMTP features remain UNTESTED and should not be relied upon for mission-critical implementations until the code matures further.***
-
-Developer Background: Hi- I'm TBOT.  I am not a professional coder but an avid computer nerd. This project was built using tools available to bridge gaps, with most of the code generated using OpenAI's GPT-4 & 1o models and Llama-based LLMs. While the code works well and was created from scratch in under 12 hours, it might benefit from a professional review. My ability to test and debug is limited, so feedback from experienced developers is encouraged. So far, the chat routing and reply system has been stable and effective...  If you're interested in contributing to this amazing project, feel free to reach out or send a request!
+I am actively looking for people to help support this project!  Please reach out to get involved!
