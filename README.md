@@ -21,6 +21,9 @@
   - Automatically chunks AI responses into multiple messages with delays to reduce strain on the mesh network & respect radio duty cycles - logic in the code automatically calculates maximum token usage for the AI API to avoid response truncation.
 - **Windows-Focused**  
   - This version officially supports Windows. Linux & Mac support is planned for a future release.
+
+**Additional Testing Note:**  
+This release has been confirmed working on a **Heltec v3** board running **Meshtastic 2.6 preview**, as well as on **Meshtastic 2.5** paired with **LMStudio 3.10** for local AI inference. However, the **OpenAI**, **Ollama**, and **SMS/Email emergency** features have not yet been field-tested. Please share your feedback, any issues, or successes when trying these features in real-world scenarios!
   
 ## 1. Changelog: v0.1 → v0.2.2
 
