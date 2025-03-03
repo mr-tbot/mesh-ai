@@ -8,6 +8,8 @@
 
 > This is **alpha software** and should **not** be relied upon for mission-critical or emergency use. It may be unstable or incomplete. Proceed with caution, and always have alternative communication methods available - modification of this code for nefarious purposes is strictly frowned upon.  Please use responsibly.
 
+> I am one robot using other robots to write this code.  Though I try to thoroughly test each release before it goes live, certain features remain thoroughly untested in the field, and version changes may break old features due to AI incompetence.  Please check the issues section for any fixes - as I have outlined a couple known fixes for issues you may encounter when running this code.  
+
 ## Features
 
 - **Multiple AI Providers**  
