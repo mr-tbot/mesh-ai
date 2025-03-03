@@ -90,14 +90,15 @@ Below is a high-level overview of the most notable changes and additions since t
 3. **Configure** `config.json` and other `.json` files as needed.  
 4. **Double-click** `Run Mesh-AI - Windows.bat`.  
 5. Meshtastic-AI will launch the Flask server and try to connect to your Meshtastic device over Serial or TCP.  
-6. Once connected, open a terminal (or your Meshtastic device) and send commands like `/ping` or `/ai hello!`  
+6. Once connected, open Meshtastic on a different node and send commands like `/ping` or `/ai hello!` to any channel the Meshtastic-AI node is a member of, and it should respond!  -  You can also DM it for responses without needing /commands.
 7. (Optional) Visit [http://localhost:5000/dashboard](http://localhost:5000/dashboard) to see the built-in dashboard.
+8. (Optional) If you set up Home-Assistant integration, you need to specify a channel index number for your bot to route requests to HA.  Create a new channel, and only use this channel on devices you want controlling your home.
 
 ## Basic Usage
 
 - **Talk to the AI:**  
-  - Send a direct message to the AI node (or a recognized shortName) using `/ai`, or just DM it if configured.  
-  - Example: `/ai Hello, how are you?`
+  - Send a direct message to the AI node (or a channel the node is a member of) using `/ai`, or just DM it with no /command if configured.  
+  - Example: `/ai Hello, how are you?` or `Hello, how are you?` if it's a DM.
 - **Check your location:**  
   - `/whereami` attempts to print your GPS coordinates (if your node has them).
 - **Emergency Alerts:**  
