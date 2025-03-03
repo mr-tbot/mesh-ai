@@ -1,8 +1,11 @@
 # Meshtastic-AI (Alpha v0.2.2)
 
-**Meshtastic-AI** is an experimental project that adds AI chatbot and extended features to your [Meshtastic](https://meshtastic.org) LoRa mesh network. It allows you to interact with a conversational AI offline (via local models) or online (via OpenAI), integrates with Home Assistant, can send emergency alerts, and is highly configurable through JSON.
+**Meshtastic-AI** is an experimental project that adds AI chatbot and extended features to your [Meshtastic](https://meshtastic.org) LoRa mesh network.  It allows you to interact with a conversational AI offline (via local models) or online (via OpenAI), integrates with Home Assistant, can send emergency alerts, and is highly configurable through JSON.  
 
 > **Disclaimer:**  
+
+> This project is NOT ASSOCIATED with the ever amazing Meshtastic Project.  It is merely meant as an extension or bridge between Meshtastic's code base and these various powerful AI / LLM APIs.
+
 > This is **alpha software** and should **not** be relied upon for mission-critical or emergency use. It may be unstable or incomplete. Proceed with caution, and always have alternative communication methods available - modification of this code for nefarious purposes is strictly frowned upon.  Please use responsibly.
 
 ## Features
