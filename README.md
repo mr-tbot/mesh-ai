@@ -116,7 +116,7 @@ Below is a detailed guide for setting up **Meshtastic-AI Alpha v0.2.2** on Windo
 
 ### A) Prerequisites
 
-REQUIRES A WINDOWS PC WITH AN ESP BASED MESHTASTIC 2.5+ NODE WITH EITHER DIRECT USB CONNECTION OR WIFI SET UP - AS WELL AS THE FOLLOWING:
+REQUIRES A WINDOWS PC WITH AN ESP BASED MESHTASTIC 2.5+ NODE WITH EITHER DIRECT USB CONNECTION OR WIFI SET UP WITH A STATIC IP - AS WELL AS THE FOLLOWING:
 
 1. **Python 3.9+**  
    - Install from [python.org](https://www.python.org/downloads/) or confirm Python 3.9+ is on your system.  
