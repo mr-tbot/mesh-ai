@@ -102,8 +102,8 @@
 
 1. **Download/Clone** this repository or copy the **meshtastic-ai** folder to your Desktop.
 2. **Install Dependencies:**  
-   - Follow the [[Installation Guide](https://chatgpt.com/g/g-p-67c3129aef7c8191947e4134e61baf8f-meshtastic-ai/c/67caeff9-f0d4-8006-8e79-24fcee0104ca#installation-guide)](#installation-guide) for dependency setup.
-3. **Configure** `config.json`, `commands_config.json`, and `motd.json` (see [[Configuration](https://chatgpt.com/g/g-p-67c3129aef7c8191947e4134e61baf8f-meshtastic-ai/c/67caeff9-f0d4-8006-8e79-24fcee0104ca#configuration)](#configuration) below).
+   - Follow the installation guide for dependency setup.
+3. **Configure** `config.json`, `commands_config.json`, and `motd.json` (see configuration below)
 4. **Double-click** `Run Mesh-AI - Windows.bat` to start the server.
 5. The Meshtastic-AI server launches the Flask WebUI on port **5000** and connects to your Meshtastic device.
 6. **Test the Setup:**  
@@ -273,7 +273,7 @@ The `config.json` file has been updated to include new options for reply modes, 
 ### C) Configure Your Files
 
 - Edit `config.json`, `commands_config.json`, and `motd.json` as needed.
-- See the [[Configuration](https://chatgpt.com/g/g-p-67c3129aef7c8191947e4134e61baf8f-meshtastic-ai/c/67caeff9-f0d4-8006-8e79-24fcee0104ca#configuration)](#configuration) section above for details.
+- See the configuration section above for details.
 
 ### D) Running the Bot
 
