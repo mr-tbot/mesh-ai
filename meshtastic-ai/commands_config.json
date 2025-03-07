@@ -1,0 +1,16 @@
+{
+  "commands": [
+    {
+      "command": "/ping",
+      "response": "Pong!"
+    },
+    {
+      "command": "/weather",
+      "response": "Currently, local weather is unknown. (This is a placeholder.)"
+    },
+	{
+	  "command": "/funfact",
+      "ai_prompt": "Give me a fun fact about {user_input}"
+    }
+  ]
+}
