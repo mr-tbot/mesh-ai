@@ -104,7 +104,7 @@
 2. **Install Dependencies:**  
    - Follow the installation guide for dependency setup.
 3. **Configure** `config.json`, `commands_config.json`, and `motd.json` (see configuration below)
-4. **Double-click** `Run Mesh-AI - Windows.bat` to start the server.
+4. Edit the file to reflect your meshtastic-ai folder location, **Double-click** `Run Mesh-AI - Windows.bat` to start the server.  You can also call the python script directly if the BAT doesn't work using "python meshtastic-ai.py".
 5. The Meshtastic-AI server launches the Flask WebUI on port **5000** and connects to your Meshtastic device.
 6. **Test the Setup:**  
    - Send commands like `/ping` or `/ai hello!` from your Meshtastic device.
@@ -251,7 +251,7 @@ The `config.json` file has been updated to include new options for reply modes, 
 
 - **Windows PC:** A machine running Windows.
 - **Meshtastic Device:** An ESP-based Meshtastic node (with USB, WiFi, or TCP connectivity).
-- **Python 3.9+:** Install from [[python.org](https://www.python.org/downloads/)](https://www.python.org/downloads/) (ensure you check “Add Python to PATH”).
+- **Python 3.13+:** Install from [[python.org](https://www.python.org/downloads/)](https://www.python.org/downloads/) (ensure you check “Add Python to PATH”).  Previous versions WILL give syntax errors!  See issues for more details!
 - **Dependencies:** Listed in `requirements.txt` (includes `meshtastic`, `requests`, `Flask`, `twilio`, etc.).
 
 ### B) Download & Setup
