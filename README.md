@@ -120,8 +120,6 @@
 - **Code Refactoring:**  
   - Overall code improvements for maintainability and clarity, with additional debug prints for troubleshooting.
 
-*(Code comparisons available in the provided files citeturn0file0, citeturn0file1 and configuration details in citeturn0file2.)*
-
 ---
 
 ## Quick Start (Windows)
