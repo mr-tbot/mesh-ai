@@ -1,338 +1,211 @@
-# Meshtastic-AI (TESTING BRANCH - CURRENTLY WORKING ON v0.4.0 - WHICH IS ALMOST READY FOR RELEASE!
-
+# Meshtastic-AI (Alpha v0.4.0)
 
 ![image](https://github.com/user-attachments/assets/bffe7a1c-3cbe-4e1d-b585-d8b3a0684128)
 
-
-**Meshtastic-AI** (MESH-AI for short) is an experimental project that bridges [[Meshtastic](https://meshtastic.org/)] LoRa mesh networks with powerful AI chatbots. In this release, the project has received a major overhaul in its WebUI along with extensive improvements in error handling, logging, and message routing options. Whether you use local models (LM Studio, Ollama) or OpenAI, or even integrate with Home Assistant, you now enjoy a more robust off-grid AI assistant experience.
+**Meshtastic-AI** (MESH-AI for short) is an experimental project that bridges [Meshtastic](https://meshtastic.org/) LoRa mesh networks with powerful AI chatbots. This release represents a major upgrade from v0.3.0 with refined logging, enhanced error handling, and expanded integration options for emergency alerts and message routing. Whether you’re using local models (LM Studio, Ollama) or OpenAI – or integrating with Home Assistant – you now enjoy a more robust off‑grid AI assistant experience.
 
 > **Disclaimer:**  
->  
-> This project is NOT ASSOCIATED with the official Meshtastic Project. It is provided as an extension to help you add AI and advanced features to your Meshtastic network.  
+> This project is NOT ASSOCIATED with the official Meshtastic Project. It is provided solely as an extension to enhance your Meshtastic network with advanced AI and connectivity features.  
 >  
 > **Alpha Software Warning:**  
-> This version is still in alpha. It may be unstable or incomplete, so please avoid relying on it for mission-critical or emergency use. Always have backup communication methods available, and please use responsibly.  
+> This version is still in alpha. It may be unstable or incomplete so please avoid relying on it for mission‑critical or emergency use. Always have backup communication methods available and use responsibly.  
 >  
 > *I am one robot using other robots to write this code. Some features are still untested in the field. Check the GitHub issues for fixes or feedback!*
 
 ---
 
-## TESTING BRANCH FEATURES IN PROGRESS
-
-Massive overhaul once again - Twilio, email, discord all fully functional - as well as emergency messages.
-
-- /sms <+15555555555> <Message>
-Sends an sms to a phone number via twilio 
-
-- SMS sent to your Twilio number can now be routed back to a node or channel.
-
-- Discord features added - a discord channel can now be routed to Meshtastic.  Details to come!
-
-- WebUI Dashboard now includes Discord messages.
-
-- /slash commands are no longer case sensitive - to help with autocorrect on cell phones.
-
-- Other fixes and optimizations.
-
-## FEATURES
+## Features
 
 - **Multiple AI Providers**  
-  - **Local** (LM Studio, Ollama) or **OpenAI** for GPT-based responses.
+  - Use **Local** models (LM Studio, Ollama), **OpenAI**, or even integrate with **Home Assistant**.
 - **Home Assistant Integration**  
-  - Seamlessly forward chat messages to Home Assistant’s conversation API (optionally secured with a PIN).
+  - Seamlessly forward messages from a designated channel to Home Assistant’s conversation API. Optionally secure this with a PIN.
 - **Advanced Slash Commands**  
-  - Built-in commands include `/about`, `/ping`, `/test`, `/help`, `/motd`, `/ai`, `/emergency`, `/whereami`, plus custom commands via `commands_config.json`.
+  - Built‑in commands include `/about`, `/ping`, `/test`, `/help`, `/motd`, `/ai` (and its aliases), `/emergency` (or `/911`), `/whereami`, plus support for custom commands defined in `commands_config.json`.  
+  - Slash commands are now **case‑insensitive**.
 - **Emergency Alerts**  
-  - Trigger SMS (Twilio), email (SMTP), and Discord notifications using the `/emergency` command.
+  - Trigger alerts that are routed via **Twilio SMS**, **SMTP Email**, and **Discord** (if enabled). Alerts include node GPS data and UTC timestamp.
 - **Enhanced REST API & WebUI**  
-  - A completely revamped Flask-based dashboard provides:
-    - **Live Messaging Dashboard** with three-column layout for broadcast messages, direct messages, and available nodes.
-    - **UI Customization** via a settings panel (theme color, hue rotation, custom sound, etc.).
-    - Additional endpoints: `/messages`, `/nodes`, `/connection_status`, `/send`, and `/ui_send` (for sending messages directly from the WebUI).
+  - A revamped Flask‑based dashboard offers:  
+    - **Live Messaging Dashboard** with three panels (broadcast messages, direct messages, and node list).
+    - **UI Customization** via a settings panel (theme color, hue rotation, custom sounds, etc.).
+    - New API endpoints including `/messages`, `/nodes`, `/connection_status`, `/logs`, `/send`, `/ui_send`, and a new `/discord_webhook` for Discord inbound messages.
 - **Improved Message Chunking & Routing**  
-  - Automatic splitting of long AI responses into up to 5 chunks (configurable) with configurable delays to reduce radio congestion.
-  - New configuration options allow you to toggle whether the bot replies to direct messages and/or channel messages.
-- **Robust Error Handling & Reconnection Logic**  
-  - Enhanced logging with a dedicated script log file (with auto-truncation) and verbose console output.
-  - Automatic detection of connection issues with threaded monitoring and graceful reconnects.
-  - Thread exception hooks to log and recover from runtime errors.
-- **Windows-Focused (with planned Linux/macOS support)**  
-  - This version officially supports Windows environments. Linux & macOS instructions are coming soon.
+  - Automatically split long AI responses into multiple chunks (up to a configurable maximum) with delays to reduce radio congestion.
+  - Configurable flags allow you to choose whether the bot replies to direct messages and/or channel messages.
+- **Robust Error Handling & Logging**  
+  - Uses UTC‑based timestamps, an auto‑truncating script log file, and improved error detection/reconnection logic (including threaded exception hooks).
+- **Cross‑Platform (Windows‑Focused)**  
+  - Official support for Windows, with Linux/macOS instructions coming soon.
+- **New Discord Integration**  
+  - Route messages to and from Discord. The WebUI dashboard now shows Discord messages if enabled, and a new `/discord_webhook` endpoint allows inbound Discord messages to be processed.
 
 ---
 
-## 1. Changelog: v0.2.2 → v0.3.0
+## Quick Start (Windows)
 
-### WebUI Overhaul
-- **Redesigned Dashboard:**  
-  The built-in dashboard now features a modern three-column layout:
-  - **Channel Messages:** View broadcast messages in real time.
-  - **Available Nodes:** See a live list of nodes with options to directly message (DM) them.
-  - **Direct Messages:** Separate panel for DM conversations.
-- **Enhanced UI Interactivity:**  
-  - A new send-message form with toggleable message mode (direct vs. broadcast).
-  - Dynamic character counting and message chunk preview.
-  - A settings panel to customize theme color, enable hue rotation, and set custom incoming message sounds.
-  - A scrolling ticker and quick-access header buttons (e.g., view logs).
-  
-  
-![image](https://github.com/user-attachments/assets/8125b5a3-a1ca-4bf4-b349-c0cd83433372)
-
-
-
-### Improved Error Handling and Stability
-- **Verbose Logging & Script Log File:**  
-  - All stdout and stderr are redirected to an in-memory log as well as to a persistent `script.log` file with auto-truncation.
-- **Connection Monitoring:**  
-  - Added a connection monitor thread that detects disconnections and triggers a reconnect automatically.
-- **Thread Exception Hook:**  
-  - Implemented Python’s threading exception hook to capture and log runtime errors for better debugging and reliability.
-
-### Enhanced Message Routing & AI Response Options
-- **Configurable Reply Modes:**  
-  - New configuration flags (`reply_in_channels` and `reply_in_directs`) allow you to control whether the AI should respond to broadcast messages and/or direct messages.
-- **Extended Message Chunking:**  
-  - Maximum message chunks increased (default now up to 5) to support longer AI responses without flooding the network.
-- **Improved Command Handling:**  
-  - Updated slash command processing including a new `/about` command.
-  - Custom commands in `commands_config.json` continue to work with dynamic AI prompts.
-
-### Expanded API Endpoints
-- **New `/nodes` Endpoint:**  
-  - Retrieve a live list of connected nodes as JSON.
-- **Updated `/connection_status` Endpoint:**  
-  - Get detailed status information including connection errors.
-- **New `/ui_send` Endpoint:**  
-  - Specifically designed for messages sent through the WebUI, supporting both direct and broadcast modes.
-
-### Other Improvements
-- **Home Assistant Integration:**  
-  - More robust handling including optional secure PIN support.
-- **Emergency Alert Enhancements:**  (STILL WIDELY UNTESTED.  DO NOT RELY ON THESE FEATURES)
-  - Expanded support for Discord alerts in addition to Twilio and SMTP.
-- **Refined Startup & Reconnection Logic:**  
-  - Cleaner reconnection loops and resource cleanup on errors.
-
----
-
-## 2. Quick Start (Windows)
-
-1. **Download/Clone** this repository or copy the **meshtastic-ai** folder to your Desktop.
+1. **Download/Clone** the repository or copy the **meshtastic-ai** folder to your Desktop.
 2. **Install Dependencies:**  
-   - Follow the installation guide for dependency setup.
-3. **Configure** `config.json`, `commands_config.json`, and `motd.json` (see configuration below)
-4. Edit the file to reflect your meshtastic-ai folder location, **Double-click** `Run Mesh-AI - Windows.bat` to start the server.  You can also call the python script directly if the BAT doesn't work using "python meshtastic-ai.py".
-5. The Meshtastic-AI server launches the Flask WebUI on port **5000** and connects to your Meshtastic device.
-6. **Test the Setup:**  
-   - Send commands like `/ping` or `/ai hello!` from your Meshtastic device.
-   - For direct DM interaction, simply send a message without a command.
-7. **Explore the WebUI:**  
-   - Open [http://localhost:5000/dashboard](http://localhost:5000/dashboard) in your browser to view the updated dashboard.
-8. (Optional) If Home Assistant integration is enabled, configure the dedicated channel index and secure PIN settings as needed.
+   - Follow the instructions in `requirements.txt` for dependency setup.
+3. **Configure Files:**  
+   - Update `config.json`, `commands_config.json`, and `motd.json` as detailed below.
+4. **Start the Bot:**  
+   - Double‑click `Run Mesh-AI - Windows.bat` or run `python meshtastic-ai.py` from your Python environment.
+5. **Access the WebUI:**  
+   - Open [http://localhost:5000/dashboard](http://localhost:5000/dashboard) to view the dashboard.
 
 ---
 
-## 3. Basic Usage
+## Detailed Setup & Configuration
 
-- **Interacting with the AI:**  
-  - Use `/ai` (or aliases `/bot`, `/query`, `/data`) followed by your message to get a response.
-  - For direct messages, simply DM the AI node (if configured to reply to direct messages).
-- **Location Query:**  
-  - Send `/whereami` to retrieve your node’s GPS coordinates (if available).
-- **Emergency Alerts:**  
-  - Trigger an emergency with `/emergency <message>` or `/911 <message>`. Alerts are sent via SMS, email, and/or Discord (if configured).  GPS data of the alerting Meshtastic node is pulled into the message .
-- **Home Assistant:**  
-  - Messages on the dedicated channel (configured via `home_assistant_channel_index`) are routed to Home Assistant’s conversation API. If secure PIN mode is enabled, include `PIN=XXXX` in your message.
-- **WebUI Messaging:**  
-  - Use the dashboard’s send-message form to broadcast or directly message other nodes. The mode toggle and node selection facilitate quick replies.
+### A) General Configuration
+Update your `config.json` with the following key settings:
+
+- **Basic Settings:**
+  - `"debug"`: Enable verbose logging if needed.
+  - `"serial_port"`, `"use_mesh_interface"`, `"use_wifi"`, `"wifi_host"`, `"wifi_port"`: Set your connectivity options.
+  - `"system_prompt"`: Customize the system message for AI responses.
+  - `"ai_provider"`: Choose between `"lmstudio"`, `"openai"`, `"ollama"`, or `"home_assistant"`.
+
+- **Message Routing & Chunking:**
+  - `"chunk_size"`: Maximum characters per message chunk.
+  - `"max_ai_chunks"`: Maximum number of chunks an AI response is split into.
+  - `"chunk_delay"`: Delay (in seconds) between sending each chunk.
+  - `"reply_in_channels"` and `"reply_in_directs"`: Toggle whether the bot replies to channel broadcasts or direct messages.
+  - `"channel_names"`: Customize display names for your channels.
+  - `"local_location_string"`: Set your node’s location description.
+  - `"ai_node_name"`: Name of the AI node (appears in responses).
+  - `"max_message_log"`: Maximum number of messages to retain in log.
+
+### B) Home Assistant Integration
+To integrate with Home Assistant:
+  
+- Set `"home_assistant_enabled": true` in your `config.json`.
+- Provide your Home Assistant details:
+  - `"home_assistant_url"`: e.g., `"http://homeassistant.local:8123/api/conversation/process"`
+  - `"home_assistant_token"`: Your Home Assistant API token.
+  - `"home_assistant_timeout"`: Request timeout (seconds).
+- **Optional Security:**  
+  - Enable secure PIN mode with `"home_assistant_enable_pin": true` and set `"home_assistant_secure_pin": "XXXX"`.
+- **Routing:**  
+  - Use `"home_assistant_channel_index"` to designate the channel from which messages are forwarded to Home Assistant.  
+  - When sending a message on this channel, if PIN mode is enabled, include your PIN (format: `PIN=XXXX your message`).
+
+### C) Twilio SMS Integration
+For SMS functionality via Twilio:
+
+- Set `"enable_twilio": true`.
+- Provide your Twilio credentials:
+  - `"twilio_sid"`: Your Twilio Account SID.
+  - `"twilio_auth_token"`: Your Twilio Auth Token.
+  - `"twilio_from_number"`: The Twilio phone number used to send messages.
+  - `"alert_phone_number"`: The recipient phone number for emergency alerts.
+- **Usage:**  
+  - Use the `/sms <phone_number> <message>` command to send SMS manually.
+  - Emergency alerts (triggered via `/emergency` or `/911`) will also route through Twilio if configured.
+
+### D) SMTP Email Integration
+To send emergency alerts via email:
+
+- Set `"enable_smtp": true`.
+- Configure your SMTP settings:
+  - `"smtp_host"`: e.g., `"smtp.example.com"`.
+  - `"smtp_port"`: Typically `465` (SSL) or `587` (TLS).
+  - `"smtp_user"` and `"smtp_pass"`: Your email login credentials.
+  - `"alert_email_to"`: An email address or list of addresses (e.g., `[ "first@example.com", "second@example.com" ]`).
+
+### E) Discord Integration
+Enhance your setup by integrating Discord:
+
+- Set `"enable_discord": true`.
+- Provide the webhook URL:  
+  - `"discord_webhook_url"`: Your Discord webhook URL.
+- Configure additional Discord settings:
+  - `"discord_send_emergency"`: If true, emergency alerts are posted to Discord.
+  - `"discord_send_ai"`: If true, AI responses are forwarded to Discord.
+  - `"discord_send_all"`: If true, all messages on the inbound channel are sent to Discord.
+  - `"discord_inbound_channel_index"`: Designate which Meshtastic channel’s messages should be forwarded to Discord.
+  - Optionally, set `"discord_bot_token"` and `"discord_channel_id"` if you plan on more advanced interactions.
+- **New Webhook Endpoint:**  
+  - The `/discord_webhook` endpoint allows external systems (or a Discord bot) to post messages into the Meshtastic network.
 
 ---
 
-## 4. Using the API
+## Using the API
+The Meshtastic-AI server starts a Flask server on port **5000** by default. Key endpoints include:
 
-The Meshtastic-AI server starts a Flask server on port **5000** by default. The key endpoints include:
-
-- **GET `/messages`:**  
-  Retrieve the last 100 messages in JSON format.
-- **GET `/nodes`:**  
-  Get a live list of connected nodes.
-- **GET `/connection_status`:**  
-  Check the current connection status and error details.
-- **GET `/dashboard`:**  
+- **GET `/messages`**  
+  Retrieve the latest messages in JSON format.
+- **GET `/nodes`**  
+  Get a list of connected nodes.
+- **GET `/connection_status`**  
+  View connection status and error details.
+- **GET `/logs`**  
+  Display a styled log view with uptime and recent log entries.
+- **GET `/dashboard`**  
   Access the full WebUI dashboard.
-- **POST `/send`:**  
-  Send a message programmatically.  
-  *Example JSON payload:*
-  ```json
-  {
-    "message": "Hello from API!",
-    "node_id": "!433e231c",
-    "channel_index": 0,
-    "direct": false
-  }
-  ```
-- **POST `/ui_send`:**  
-  Endpoint used by the WebUI form to send messages (supports both direct and broadcast modes).
+- **POST `/send`** and **POST `/ui_send`**  
+  Programmatically send messages.
+- **POST `/discord_webhook`**  
+  Receive messages from Discord (if enabled).
 
 ---
 
-## 5. Configuration
+## Detailed Changelog: v0.3.0 → v0.4.0
 
-The `config.json` file has been updated to include new options for reply modes, UI settings, and additional endpoint configurations. An example configuration is shown below:
+**1. Logging & Timestamps**  
+- **v0.3.0:** Timestamps were generated using local time.  
+- **v0.4.0:** Logging now uses UTC-based timestamps (via Python’s `timezone.utc`), ensuring consistency across distributed nodes. The log file auto‑truncates when exceeding 100 MB by keeping the last 100 lines.  
+*(See v0.4.0 code changes – citeturn0file0 vs. citeturn0file1)*
 
-```json
-{
-  "debug": false,
-  "use_mesh_interface": false,
-  "use_wifi": true,
-  "wifi_host": "<MESHTASTIC NODE IP HERE>",
-  "wifi_port": 4403,
+**2. Discord Integration Enhancements**  
+- **v0.3.0:** Limited or no built‑in support for Discord routing.  
+- **v0.4.0:**  
+  - Added new configuration variables such as `discord_inbound_channel_index`, `discord_bot_token`, and `discord_channel_id`.  
+  - Introduced a new `/discord_webhook` endpoint to allow inbound Discord messages to be processed and displayed on the WebUI.  
+  - Expanded emergency alert capabilities to include Discord notifications if enabled.  
+*(Refer to the new Discord-related code in v0.4.0 – citeturn0file0)*
 
-  "serial_port": "",
-  "ai_provider": "<lmstudio, openai, or ollama>",
-  "system_prompt": "You are a helpful assistant responding to mesh network chats. Respond in as few words as possible while still answering fully.",
+**3. Emergency Alerts**  
+- **v0.3.0:** Emergency alerts were sent via SMS and SMTP if configured.  
+- **v0.4.0:** Emergency notifications now include additional context (e.g., GPS coordinates, UTC timestamp) and can also be sent via Discord. The routing logic checks configuration for each channel before attempting delivery.  
+*(Changes seen in the `send_emergency_notification` function – citeturn0file0)*
 
-  "lmstudio_url": "http://localhost:1234/v1/chat/completions",
-  "lmstudio_timeout": 60,
+**4. Command Handling & AI Routing**  
+- **v0.3.0:** Commands were processed with a basic case‑sensitive handler.  
+- **v0.4.0:** Slash commands are now case‑insensitive, reducing issues with mobile autocorrect. Custom commands from `commands_config.json` are supported with dynamic AI prompts, and special handling is applied when using Home Assistant integration with secure PIN mode.  
+*(Command handling improvements in v0.4.0 – citeturn0file0)*
 
-  "openai_api_key": "",
-  "openai_model": "gpt-3.5-turbo",
-  "openai_timeout": 60,
+**5. Error Handling & Reconnection Logic**  
+- **v0.3.0:** Basic error handling with standard reconnection loops.  
+- **v0.4.0:** Enhanced detection of connection errors (e.g., specific OSError codes) triggers a graceful reconnect using a global reset event. Thread exception hooks and verbose logging further improve stability.  
+*(Reviewed in the connection error sections in v0.4.0 – citeturn0file0)*
 
-  "ollama_url": "http://localhost:11434/api/generate",
-  "ollama_model": "llama2",
-  "ollama_timeout": 60,
-
-  "home_assistant_url": "http://homeassistant.local:8123/api/conversation/process",
-  "home_assistant_token": "<INPUT HA TOKEN HERE>",
-  "home_assistant_timeout": 90,
-  "home_assistant_enable_pin": false,
-  "home_assistant_secure_pin": "1234",
-
-  "home_assistant_enabled": false,
-  "home_assistant_channel_index": 1,
-
-  "channel_names": {
-    "0": "LongFast",
-    "1": "Channel 1",
-    "2": "Channel 2",
-    "3": "Channel 3",
-    "4": "Channel 4",
-    "5": "Channel 5",
-    "6": "Channel 6",
-    "7": "Channel 7",
-    "8": "Channel 8",
-    "9": "Channel 9"
-  },
-  "reply_in_channels": true,
-  "reply_in_directs": true,
-
-  "chunk_size": 200,
-  "max_ai_chunks": 4,
-  "chunk_delay": 10,
-  "local_location_string": "@ <YOUR LOCATION STRING HERE>",
-  "ai_node_name": "Mesh-AI-Alpha",
-  "max_message_log": 0,
-
-  "enable_twilio": false,
-  "enable_smtp": false,
-  "alert_phone_number": "+15555555555",
-  "twilio_sid": "<TWILIO_SID>",
-  "twilio_auth_token": "<TWILIO_AUTH_TOKEN>",
-  "twilio_from_number": "+14444444444",
-
-  "smtp_host": "<SMTP HOST HERE>",
-  "smtp_port": 465,
-  "smtp_user": "<SMTP USER HERE>",
-  "smtp_pass": "<SMTP PASS HERE>",
-  "alert_email_to": "<ALERT EMAIL HERE>",
-
-  "enable_discord": false,
-  "discord_webhook_url": "",
-  "discord_send_emergency": false,
-  "discord_send_ai": false,
-  "discord_send_all": false
-}
-```
-
-*Key new options:*
-- **`reply_in_channels` / `reply_in_directs`:** Control whether the AI responds to broadcast channels and/or direct messages.
-- **`channel_names`:** Customize the display names for channels (the WebUI will use these names).
-- **Enhanced timeout and chunk settings** for more robust AI interactions.
+**6. Miscellaneous Improvements**  
+- Updated banner and version text now clearly identify the testing branch as v0.4.0.  
+- Overall code refactoring for clarity and better maintainability.
+- Additional comments and debug prints assist in troubleshooting and field testing.
 
 ---
 
-## 6. Installation Guide
-
-### A) Prerequisites
-
-- **Windows PC:** A machine running Windows.
-- **Meshtastic Device:** An ESP-based Meshtastic node (with USB, WiFi, or TCP connectivity).
-- **Python 3.13+:** Install from [[python.org](https://www.python.org/downloads/)](https://www.python.org/downloads/) (ensure you check “Add Python to PATH”).  Previous versions WILL give syntax errors!  See issues for more details!
-- **Dependencies:** Listed in `requirements.txt` (includes `meshtastic`, `requests`, `Flask`, `twilio`, etc.).
-
-### B) Download & Setup
-
-1. **Obtain the Source:**  
-   - Clone the [[GitHub repository](https://github.com/mr-tbot/meshtastic-ai)](https://github.com/mr-tbot/meshtastic-ai) or copy the **meshtastic-ai** folder to your Desktop.
-2. **Create a Virtual Environment (Recommended):**
-   ```bash
-   cd path\to\meshtastic-ai
-   python -m venv venv
-   venv\Scripts\activate
-   ```
-3. **Install Dependencies:**
-   ```bash
-   pip install --upgrade pip
-   pip install -r requirements.txt
-   ```
-
-### C) Configure Your Files
-
-- Edit `config.json`, `commands_config.json`, and `motd.json` as needed.
-- See the configuration section above for details.
-
-### D) Running the Bot
-
-1. **Start the Bot:**  
-   - Double-click `Run Mesh-AI - Windows.bat` or run the main script via your Python environment.
-2. **Monitor the Console:**  
-   - Logs will show connection attempts, AI responses, and any errors.
-3. **Access the WebUI:**  
-   - Open [http://localhost:5000/dashboard](http://localhost:5000/dashboard) in your browser to interact with the dashboard.
-
----
-
-## 7. Home Assistant & LLM API Integration
-
-### Home Assistant
-- Enable by setting `"home_assistant_enabled": true` in `config.json`.
-- Configure the API URL, token, and optionally secure PIN settings.
-- Any message on the designated channel (e.g., channel 1) will be forwarded to Home Assistant.
-
-### LLM APIs
-- **LM Studio:** Set `"ai_provider": "lmstudio"` and configure the LM Studio URL.
-- **OpenAI:** Set `"ai_provider": "openai"`, provide your OpenAI API key, and select the model.
-- **Ollama:** Set `"ai_provider": "ollama"` and configure the URL/model details.
-
----
-
-## 8. Contributing & Disclaimer
+## Contributing & Disclaimer
 
 - **Alpha Software Notice:**  
-  This release (v0.3.0) is still experimental. Expect bugs and changes that might affect existing features.  A lot of this is not field tested...  
+  This release (v0.4.0) is experimental. Expect bugs and changes that might affect existing features. Thorough field testing is still recommended before deployment in production environments.
 - **Feedback & Contributions:**  
-  Please report issues or submit pull requests on GitHub. Your input and participation is invaluable for improving the project.
+  Report issues or submit pull requests on GitHub. Your feedback is invaluable in making this project more robust.
 - **Use Responsibly:**  
-  Modification of this code for nefarious purposes is strictly frowned upon.
+  Modifications for nefarious purposes are strictly prohibited. Use at your own risk.
 
 ---
 
-## 9. Conclusion
+## Conclusion
 
-Meshtastic-AI Alpha v0.3.0 brings a powerful new WebUI, enhanced stability, and greater configurability to your Meshtastic network’s AI assistant. Whether you’re chatting directly with your node or managing your Home Assistant offline -  this release helps you stay connected—even off the grid.
+Meshtastic-AI Alpha v0.4.0 builds upon the solid foundation of v0.3.0, introducing significant enhancements in logging, emergency alert routing, Discord integration, and overall stability. Whether you’re interacting directly with your mesh node, integrating with Home Assistant, or leveraging multi‑channel alerting (Twilio, Email, Discord), this release offers a more comprehensive and reliable off‑grid AI assistant experience.
 
-**Enjoy tinkering, stay safe, and have fun!**
-
-**Thank you for using Meshtastic-AI Alpha v0.3.0!**  
+**Enjoy tinkering, stay safe, and have fun!**  
 Please share your feedback or join our community on GitHub.
+
+---
+
+Happy coding, and may your mesh always stay connected!
