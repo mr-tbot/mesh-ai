@@ -17,7 +17,24 @@
 
 ---
 
-## Features
+## TESTING BRANCH FEATURES IN PROGRESS
+
+Massive overhaul once again - Twilio, email, discord all fully functional - as well as emergency messages.
+
+- /sms <+15555555555> <Message>
+Sends an sms to a phone number via twilio 
+
+- SMS sent to your Twilio number can now be routed back to a node or channel.
+
+- Discord features added - a discord channel can now be routed to Meshtastic.  Details to come!
+
+- WebUI Dashboard now includes Discord messages.
+
+- /slash commands are no longer case sensitive - to help with autocorrect on cell phones.
+
+- Other fixes and optimizations.
+
+## FEATURES
 
 - **Multiple AI Providers**  
   - **Local** (LM Studio, Ollama) or **OpenAI** for GPT-based responses.
