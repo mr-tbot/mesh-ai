@@ -1,4 +1,4 @@
-# Meshtastic-AI (Alpha v0.3.0)
+# Meshtastic-AI (TESTING BRANCH - CURRENTLY WORKING ON v0.4.0 - WHICH IS ALMOST READY FOR RELEASE!
 
 
 ![image](https://github.com/user-attachments/assets/bffe7a1c-3cbe-4e1d-b585-d8b3a0684128)
