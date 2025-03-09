@@ -1,33 +1,37 @@
 {
   "debug": false,
+  
+  "serial_port": "",
+  
   "use_mesh_interface": false,
-  "use_wifi": true,
-  "wifi_host": "MESHTASTIC NODE IP HERE",
+  
+  "use_wifi": false,
+  "wifi_host": "MESHTASTIC WIFI NODE IP HERE",
   "wifi_port": 4403,
 
-  "serial_port": "",
-  "ai_provider": "openai",
+  "ai_provider": "lmstudio openai or ollama",
+  
   "system_prompt": "You are a helpful assistant responding to mesh network chats. Respond in as few words as possible while still answering fully.",
-
-  "openai_api_key": "YOUR_API_KEY_HERE",
+  
+  "lmstudio_url": "http://localhost:1234/v1/chat/completions",
+  "lmstudio_timeout": 60,
+  
+  "openai_api_key": "",
   "openai_model": "gpt-3.5-turbo",
   "openai_timeout": 30,
-
-  "lmstudio_url": "",
-  "lmstudio_timeout": 60,
-
-  "ollama_url": "",
-  "ollama_model": "",
+  
+  "ollama_url": "http://localhost:11434/api/generate",
+  "ollama_model": "llama2",
   "ollama_timeout": 60,
-
-  "home_assistant_enabled": false,
+  
   "home_assistant_url": "",
   "home_assistant_token": "",
-  "home_assistant_timeout": 90,
+  "home_assistant_timeout": 30,
   "home_assistant_enable_pin": false,
-  "home_assistant_secure_pin": "",
-  "home_assistant_channel_index": 0,
-
+  "home_assistant_secure_pin": "1234",
+  "home_assistant_enabled": false,
+  "home_assistant_channel_index": -1,
+  
   "channel_names": {
     "0": "Channel 0",
     "1": "Channel 1",
@@ -37,35 +41,38 @@
     "5": "Channel 5",
     "6": "Channel 6",
     "7": "Channel 7",
-    "8": "Channel 8",
-    "9": "Channel 9"
+	  "8": "Channel 8",
+	  "9": "Channel 9"
   },
+  
   "reply_in_channels": true,
   "reply_in_directs": true,
-
   "chunk_size": 200,
-  "max_ai_chunks": 4,
+  "max_ai_chunks": 5,
   "chunk_delay": 10,
+  
   "local_location_string": "@ MY LOCATION",
-  "ai_node_name": "MESH-AI-ALPHA",
-  "max_message_log": 0,
-
+  "ai_node_name": "Mesh-AI-Alpha",
+  
+  "max_message_log": 100,
+  
   "enable_twilio": false,
   "enable_smtp": false,
+  
   "alert_phone_number": "",
   "twilio_sid": "",
   "twilio_auth_token": "",
   "twilio_from_number": "",
-  "twilio_inbound_target": "",
+  "twilio_inbound_target": "channel",
   "twilio_inbound_channel_index": 0,
   "twilio_inbound_node": null,
-
+  
   "smtp_host": "",
-  "smtp_port": 465,
+  "smtp_port": 587,
   "smtp_user": "",
   "smtp_pass": "",
   "alert_email_to": "",
-
+  
   "enable_discord": false,
   "discord_webhook_url": "",
   "discord_send_emergency": false,
