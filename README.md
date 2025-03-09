@@ -146,7 +146,7 @@
 4. **Start the Bot:**  
    - Run the bot by double‑clicking `Run Mesh-AI - Windows.bat` or by executing:
      ```bash
-     python meshtastic-ai.py
+     python meshtastic_ai.py
      ```
 5. **Access the WebUI Dashboard:**  
    - Open your browser and navigate to [http://localhost:5000/dashboard](http://localhost:5000/dashboard).
@@ -322,7 +322,7 @@ Your `config.json` file controls almost every aspect of Meshtastic-AI. Below is 
 
 ### C) Running the Bot
 1. **Start the Bot:**  
-   - Double‑click `Run Mesh-AI - Windows.bat` or run `python meshtastic-ai.py` directly.
+   - Double‑click `Run Mesh-AI - Windows.bat` or run `python meshtastic_ai.py` directly.
 2. **Monitor the Console:**  
    - Logs will show connection attempts, AI responses, and any errors.
 3. **Access the WebUI:**  
