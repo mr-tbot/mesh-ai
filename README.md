@@ -104,7 +104,7 @@
 - **Additional Improvements:**  
   - Robust Home Assistant integration and basic emergency alert enhancements.
 
-### New Updates in v0.3.0 → v0.4.0 (Testing Branch Updates)
+### New Updates in v0.3.0 → v0.4.0
 - **Logging & Timestamps:**  
   - Shift to UTC‑based timestamps and enhanced log management.
 - **Discord Integration:**  
@@ -112,6 +112,9 @@
   - Introduced a new `/discord_webhook` endpoint for processing messages from Discord.
 - **Emergency Notifications:**  
   - Expanded emergency alert logic to include detailed context (GPS data, UTC time) and Discord notifications.
+- **Sending and receiving SMS:**  
+  - Send SMS using `/sms <+15555555555> <message>`
+  - Config options to either route incoming Twilio SMS messages to a specific node, or a channel index.
 - **Command Handling:**  
   - Made all slash commands case‑insensitive to improve usability.
   - Enhanced custom command support via `commands_config.json` with dynamic AI prompt insertion.
@@ -163,6 +166,9 @@
 - **Emergency Alerts:**  
   - Trigger an emergency using `/emergency <message>` or `/911 <message>`.  
     - These commands send alerts via Twilio, SMTP, and Discord (if enabled), including GPS data and timestamps.
+- **Sending and receiving SMS:**  
+  - Send SMS using `/sms <+15555555555> <message>`
+  - Config options to either route incoming Twilio SMS messages to a specific node, or a channel index.
 - **Home Assistant Integration:**  
   - When enabled, messages sent on the designated Home Assistant channel (as defined by `"home_assistant_channel_index"`) are forwarded to Home Assistant’s conversation API.
   - In secure mode, include the PIN in your message (format: `PIN=XXXX your message`).
