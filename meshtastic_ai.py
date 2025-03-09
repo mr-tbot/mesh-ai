@@ -5,7 +5,7 @@ from pubsub import pub
 import json
 import requests
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone  # Added timezone import
 import threading
 import os
 import smtplib
@@ -15,17 +15,18 @@ import traceback
 from flask import Flask, request, jsonify, redirect, url_for
 import sys
 import socket  # for socket error checking
+from twilio.rest import Client  # for Twilio SMS support
 
 # -----------------------------
 # Verbose Logging Setup
 # -----------------------------
 SCRIPT_LOG_FILE = "script.log"
 script_logs = []  # In-memory log entries (most recent 200)
-server_start_time = datetime.now()
+server_start_time = datetime.now(timezone.utc)  # Now using UTC time
 restart_count = 0
 
 def add_script_log(message):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     log_entry = f"{timestamp} - {message}"
     script_logs.append(log_entry)
     if len(script_logs) > 200:
@@ -94,7 +95,7 @@ BANNER = (
 ██║ ╚═╝ ██║███████╗███████║██║  ██║   ██║   ██║  ██║███████║   ██║   ██║╚██████╗              ██║  ██║██║
 ╚═╝     ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝ ╚═════╝              ╚═╝  ╚═╝╚═╝
     
-Meshtastic-AI Alpha v0.3.0 by: MR_TBOT (https://mr-tbot.com)
+Meshtastic-AI Alpha v0.4.0 TESTING BRANCH by: MR_TBOT (https://mr-tbot.com)
 https://github.com/mr-tbot/meshtastic-ai/
     \033[32m 
 Messaging Dashboard Access: http://localhost:5000/dashboard \033[38;5;214m
@@ -112,6 +113,9 @@ Modification of this code for nefarious purposes is strictly frowned upon. Pleas
 print(BANNER)
 add_script_log("Script started.")
 
+# -----------------------------
+# Load Config Files
+# -----------------------------
 CONFIG_FILE = "config.json"
 COMMANDS_CONFIG_FILE = "commands_config.json"
 MOTD_FILE = "motd.json"
@@ -152,6 +156,9 @@ def info_print(*args, **kwargs):
 if DEBUG_ENABLED:
     print(f"DEBUG: Loaded main config => {config}")
 
+# -----------------------------
+# AI Provider & Other Config Vars
+# -----------------------------
 AI_PROVIDER = config.get("ai_provider", "lmstudio").lower()
 SYSTEM_PROMPT = config.get("system_prompt", "You are a helpful assistant responding to mesh network chats.")
 LMSTUDIO_URL = config.get("lmstudio_url", "http://localhost:1234/v1/chat/completions")
@@ -182,6 +189,15 @@ DISCORD_WEBHOOK_URL = config.get("discord_webhook_url", None)
 DISCORD_SEND_EMERGENCY = config.get("discord_send_emergency", False)
 DISCORD_SEND_AI = config.get("discord_send_ai", False)
 DISCORD_SEND_ALL = config.get("discord_send_all", False)
+DISCORD_RESPONSE_CHANNEL_INDEX = config.get("discord_response_channel_index", None)
+DISCORD_RECEIVE_ENABLED = config.get("discord_receive_enabled", True)
+# New variable for inbound routing
+DISCORD_INBOUND_CHANNEL_INDEX = config.get("discord_inbound_channel_index", None)
+if DISCORD_INBOUND_CHANNEL_INDEX is not None:
+    DISCORD_INBOUND_CHANNEL_INDEX = int(DISCORD_INBOUND_CHANNEL_INDEX)
+# For polling Discord messages (optional)
+DISCORD_BOT_TOKEN = config.get("discord_bot_token", None)
+DISCORD_CHANNEL_ID = config.get("discord_channel_id", None)
 
 ENABLE_TWILIO = config.get("enable_twilio", False)
 ENABLE_SMTP = config.get("enable_smtp", False)
@@ -207,6 +223,18 @@ interface = None
 
 lastDMNode = None
 lastChannelIndex = None
+
+# -----------------------------
+# Location Lookup Function
+# -----------------------------
+def get_node_location(node_id):
+    if interface and hasattr(interface, "nodes") and node_id in interface.nodes:
+        pos = interface.nodes[node_id].get("position", {})
+        lat = pos.get("latitude")
+        lon = pos.get("longitude")
+        tstamp = pos.get("time")
+        return lat, lon, tstamp
+    return None, None, None
 
 def load_archive():
     global messages
@@ -251,12 +279,25 @@ def parse_node_id(node_str_or_int):
             return None
     return None
 
+def get_node_fullname(node_id):
+    """Return the full (long) name if available, otherwise the short name."""
+    if interface and hasattr(interface, "nodes") and node_id in interface.nodes:
+        user_dict = interface.nodes[node_id].get("user", {})
+        return user_dict.get("longName", user_dict.get("shortName", f"Node_{node_id}"))
+    return f"Node_{node_id}"
+
+def get_node_shortname(node_id):
+    if interface and hasattr(interface, "nodes") and node_id in interface.nodes:
+        user_dict = interface.nodes[node_id].get("user", {})
+        return user_dict.get("shortName", f"Node_{node_id}")
+    return f"Node_{node_id}"
+
 def log_message(node_id, text, is_emergency=False, reply_to=None, direct=False, channel_idx=None):
     if node_id != "WebUI":
         display_id = f"{get_node_shortname(node_id)} ({node_id})"
     else:
         display_id = "WebUI"
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     entry = {
         "timestamp": timestamp,
         "node": display_id,
@@ -286,6 +327,9 @@ def split_message(text):
 def send_broadcast_chunks(interface, text, channelIndex):
     dprint(f"send_broadcast_chunks: text='{text}', channelIndex={channelIndex}")
     info_print(f"[Info] Sending broadcast on channel {channelIndex} → '{text}'")
+    if interface is None:
+        print("❌ Cannot send broadcast: interface is None.")
+        return
     if not text:
         return
     chunks = split_message(text)
@@ -304,6 +348,9 @@ def send_broadcast_chunks(interface, text, channelIndex):
 def send_direct_chunks(interface, text, destinationId):
     dprint(f"send_direct_chunks: text='{text}', destId={destinationId}")
     info_print(f"[Info] Sending direct message to node {destinationId} => '{text}'")
+    if interface is None:
+        print("❌ Cannot send direct message: interface is None.")
+        return
     if not text:
         return
     ephemeral_ok = hasattr(interface, "sendDirectText")
@@ -448,21 +495,6 @@ def get_ai_response(prompt):
         print(f"⚠️ Unknown AI provider: {AI_PROVIDER}")
         return None
 
-def get_node_shortname(node_id):
-    if interface and hasattr(interface, "nodes") and node_id in interface.nodes:
-        user_dict = interface.nodes[node_id].get("user", {})
-        return user_dict.get("shortName", f"Node_{node_id}")
-    return f"Node_{node_id}"
-
-def get_node_location(node_id):
-    if interface and hasattr(interface, "nodes") and node_id in interface.nodes:
-        pos = interface.nodes[node_id].get("position", {})
-        lat = pos.get("latitude")
-        lon = pos.get("longitude")
-        tstamp = pos.get("time")
-        return lat, lon, tstamp
-    return None, None, None
-
 def send_discord_message(content):
     if not (ENABLE_DISCORD and DISCORD_WEBHOOK_URL):
         return
@@ -471,19 +503,25 @@ def send_discord_message(content):
     except Exception as e:
         print(f"⚠️ Discord webhook error: {e}")
 
+# -----------------------------
+# Revised Emergency Notification Function
+# -----------------------------
 def send_emergency_notification(node_id, user_msg, lat=None, lon=None, position_time=None):
     info_print("[Info] Sending emergency notification...")
-    full_msg = f"EMERGENCY from Node {node_id}:\n"
+
+    sn = get_node_shortname(node_id)
+    fullname = get_node_fullname(node_id)
+    full_msg = f"EMERGENCY from {sn} ({fullname}) [Node {node_id}]:\n"
     if lat is not None and lon is not None:
         full_msg += f" - GPS: {lat}, {lon}\n"
     if position_time:
         full_msg += f" - Last GPS time: {position_time}\n"
     if user_msg:
         full_msg += f" - Message: {user_msg}\n"
-    success = False
-    if ENABLE_TWILIO and TWILIO_SID and TWILIO_AUTH_TOKEN and ALERT_PHONE_NUMBER and TWILIO_FROM_NUMBER:
-        try:
-            from twilio.rest import Client
+    
+    # Attempt to send SMS via Twilio if configured.
+    try:
+        if ENABLE_TWILIO and TWILIO_SID and TWILIO_AUTH_TOKEN and ALERT_PHONE_NUMBER and TWILIO_FROM_NUMBER:
             client = Client(TWILIO_SID, TWILIO_AUTH_TOKEN)
             client.messages.create(
                 body=full_msg,
@@ -491,34 +529,49 @@ def send_emergency_notification(node_id, user_msg, lat=None, lon=None, position_
                 to=ALERT_PHONE_NUMBER
             )
             print("✅ Emergency SMS sent via Twilio.")
-            success = True
-        except Exception as e:
-            print(f"⚠️ Twilio error: {e}")
-    if not success and ENABLE_SMTP and SMTP_HOST and SMTP_USER and SMTP_PASS and ALERT_EMAIL_TO:
-        try:
+        else:
+            print("Twilio not properly configured for SMS.")
+    except Exception as e:
+        print(f"⚠️ Twilio error: {e}")
+
+    # Attempt to send email via SMTP if configured.
+    try:
+        if ENABLE_SMTP and SMTP_HOST and SMTP_USER and SMTP_PASS and ALERT_EMAIL_TO:
+            if isinstance(ALERT_EMAIL_TO, list):
+                email_to = ", ".join(ALERT_EMAIL_TO)
+            else:
+                email_to = ALERT_EMAIL_TO
             msg = MIMEText(full_msg)
             msg["Subject"] = f"EMERGENCY ALERT from Node {node_id}"
             msg["From"] = SMTP_USER
-            msg["To"] = ALERT_EMAIL_TO
-            s = smtplib.SMTP(SMTP_HOST, SMTP_PORT)
-            s.starttls()
+            msg["To"] = email_to
+            if SMTP_PORT == 465:
+                s = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT)
+            else:
+                s = smtplib.SMTP(SMTP_HOST, SMTP_PORT)
+                s.starttls()
             s.login(SMTP_USER, SMTP_PASS)
-            s.sendmail(SMTP_USER, ALERT_EMAIL_TO, msg.as_string())
+            s.sendmail(SMTP_USER, email_to, msg.as_string())
             s.quit()
             print("✅ Emergency email sent via SMTP.")
-            success = True
-        except Exception as e:
-            print(f"⚠️ SMTP error: {e}")
-    if DISCORD_SEND_EMERGENCY and ENABLE_DISCORD and DISCORD_WEBHOOK_URL:
-        try:
+        else:
+            print("SMTP not properly configured for email alerts.")
+    except Exception as e:
+        print(f"⚠️ SMTP error: {e}")
+
+    # Attempt to post emergency alert to Discord if enabled.
+    try:
+        if DISCORD_SEND_EMERGENCY and ENABLE_DISCORD and DISCORD_WEBHOOK_URL:
             requests.post(DISCORD_WEBHOOK_URL, json={"content": full_msg})
             print("✅ Emergency alert posted to Discord.")
-            success = True
-        except Exception as e:
-            print(f"⚠️ Discord webhook error: {e}")
-    if not success:
-        print("⚠️ No emergency alert was successfully sent. Check config.")
+        else:
+            print("Discord emergency notifications disabled or not configured.")
+    except Exception as e:
+        print(f"⚠️ Discord webhook error: {e}")
 
+# -----------------------------
+# Helper: Validate/Strip PIN (for Home Assistant)
+# -----------------------------
 def pin_is_valid(text):
     lower = text.lower()
     if "pin=" not in lower:
@@ -548,7 +601,11 @@ def route_message_text(user_message, channel_idx):
         resp = get_ai_response(user_message)
         return resp if resp else "🤖 [No AI response]"
 
+# -----------------------------
+# Revised Command Handler (Case-Insensitive)
+# -----------------------------
 def handle_command(cmd, full_text, sender_id):
+    cmd = cmd.lower()
     dprint(f"handle_command => cmd='{cmd}', full_text='{full_text}', sender_id={sender_id}")
     if cmd == "/about":
         return "Meshtastic-AI Off Grid Chat Bot - By: MR-TBOT.com"
@@ -573,17 +630,35 @@ def handle_command(cmd, full_text, sender_id):
         send_emergency_notification(sender_id, user_msg, lat, lon, tstamp)
         log_message(sender_id, f"EMERGENCY TRIGGERED: {full_text}", is_emergency=True)
         return "🚨 Emergency alert sent. Stay safe."
-    elif cmd in ["/test"]:
+    elif cmd == "/test":
         sn = get_node_shortname(sender_id)
         return f"Hello {sn}! Received {LOCAL_LOCATION_STRING} by {AI_NODE_NAME}."
-    elif cmd in ["/help"]:
+    elif cmd == "/help":
         built_in = ["/about", "/query", "/whereami", "/emergency", "/911", "/test", "/motd"]
         custom_cmds = [c.get("command") for c in commands_config.get("commands",[])]
         return "Commands:\n" + ", ".join(built_in + custom_cmds)
     elif cmd == "/motd":
         return motd_content
+    elif cmd == "/sms":
+        parts = full_text.split(" ", 2)
+        if len(parts) < 3:
+            return "Invalid syntax. Use: /sms <phone_number> <message>"
+        phone_number = parts[1]
+        message_text = parts[2]
+        try:
+            client = Client(TWILIO_SID, TWILIO_AUTH_TOKEN)
+            client.messages.create(
+                body=message_text,
+                from_=TWILIO_FROM_NUMBER,
+                to=phone_number
+            )
+            print(f"✅ SMS sent to {phone_number}")
+            return "SMS sent successfully."
+        except Exception as e:
+            print(f"⚠️ Failed to send SMS: {e}")
+            return "Failed to send SMS."
     for c in commands_config.get("commands", []):
-        if c.get("command") == cmd:
+        if c.get("command").lower() == cmd:
             if "ai_prompt" in c:
                 user_input = full_text[len(cmd):].strip()
                 custom_text = c["ai_prompt"].replace("{user_input}", user_input)
@@ -640,10 +715,13 @@ def on_receive(packet=None, interface=None, **kwargs):
             lastDMNode = sender_node
         else:
             lastChannelIndex = ch_idx
-        if ENABLE_DISCORD and DISCORD_SEND_ALL:
+
+        # Only forward messages on the configured Discord inbound channel to Discord.
+        if ENABLE_DISCORD and DISCORD_SEND_ALL and DISCORD_INBOUND_CHANNEL_INDEX is not None and ch_idx == DISCORD_INBOUND_CHANNEL_INDEX:
             sender_info = f"{get_node_shortname(sender_node)} ({sender_node})"
             disc_content = f"**{sender_info}**: {text}"
             send_discord_message(disc_content)
+
         my_node_num = None
         if FORCE_NODE_NUM is not None:
             my_node_num = FORCE_NODE_NUM
@@ -664,7 +742,8 @@ def on_receive(packet=None, interface=None, **kwargs):
             info_print("[Info] Wait 10s before responding to reduce collisions.")
             time.sleep(10)
             log_message(AI_NODE_NAME, resp, reply_to=entry['timestamp'])
-            if ENABLE_DISCORD and DISCORD_SEND_AI:
+            # If message originated on Discord inbound channel, also send the AI response back to Discord.
+            if ENABLE_DISCORD and DISCORD_SEND_AI and DISCORD_INBOUND_CHANNEL_INDEX is not None and ch_idx == DISCORD_INBOUND_CHANNEL_INDEX:
                 disc_msg = f"🤖 **{AI_NODE_NAME}**: {resp}"
                 send_discord_message(disc_msg)
             if is_direct:
@@ -703,7 +782,7 @@ def connection_status_info():
 
 @app.route("/logs", methods=["GET"])
 def logs():
-    uptime = datetime.now() - server_start_time
+    uptime = datetime.now(timezone.utc) - server_start_time
     uptime_str = str(uptime).split('.')[0]
     html = f"""<html>
 <head>
@@ -745,6 +824,67 @@ def logs():
 </body>
 </html>"""
     return html
+
+# -----------------------------
+# Revised Discord Webhook Route for Inbound Messages
+# -----------------------------
+@app.route("/discord_webhook", methods=["POST"])
+def discord_webhook():
+    if not DISCORD_RECEIVE_ENABLED:
+        return jsonify({"status": "disabled", "message": "Discord receive is disabled"}), 200
+    data = request.json
+    if not data:
+        return jsonify({"status": "error", "message": "No JSON payload provided"}), 400
+
+    # Extract the username (default if not provided)
+    username = data.get("username", "DiscordUser")
+    channel_index = DISCORD_INBOUND_CHANNEL_INDEX
+    message_text = data.get("message")
+    if message_text is None:
+        return jsonify({"status": "error", "message": "Missing message"}), 400
+
+    # Prepend username to the message
+    formatted_message = f"**{username}**: {message_text}"
+
+    try:
+        log_message("Discord", formatted_message, direct=False, channel_idx=int(channel_index))
+        if interface is None:
+            print("❌ Cannot route Discord message: interface is None.")
+        else:
+            send_broadcast_chunks(interface, formatted_message, int(channel_index))
+        print(f"✅ Routed Discord message back on channel {channel_index}")
+        return jsonify({"status": "sent", "channel_index": channel_index, "message": formatted_message})
+    except Exception as e:
+        print(f"⚠️ Discord webhook error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# -----------------------------
+# New Twilio SMS Webhook Route for Inbound SMS
+# -----------------------------
+@app.route("/twilio_webhook", methods=["POST"])
+def twilio_webhook():
+    sms_body = request.form.get("Body")
+    from_number = request.form.get("From")
+    if not sms_body:
+        return "No SMS body received", 400
+    target = config.get("twilio_inbound_target", "channel")
+    if target == "channel":
+        channel_index = config.get("twilio_inbound_channel_index")
+        if channel_index is None:
+            return "No inbound channel index configured", 400
+        log_message("Twilio", f"From {from_number}: {sms_body}", direct=False, channel_idx=int(channel_index))
+        send_broadcast_chunks(interface, sms_body, int(channel_index))
+        print(f"✅ Routed incoming SMS from {from_number} to channel {channel_index}")
+    elif target == "node":
+        node_id = config.get("twilio_inbound_node")
+        if node_id is None:
+            return "No inbound node configured", 400
+        log_message("Twilio", f"From {from_number}: {sms_body}", direct=True)
+        send_direct_chunks(interface, sms_body, node_id)
+        print(f"✅ Routed incoming SMS from {from_number} to node {node_id}")
+    else:
+        return "Invalid twilio_inbound_target config", 400
+    return "SMS processed", 200
 
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
@@ -932,6 +1072,46 @@ def dashboard():
     }
   </style>
   <script>
+  // Global variables to store the last DM and channel targets
+  var lastDMTarget = null;
+  var lastChannelTarget = null;
+
+  // Reply using the last direct message target
+  function replyToLastDM() {
+    if (lastDMTarget !== null) {
+      replyToMessage('direct', lastDMTarget);
+    } else {
+      alert("No direct message target available.");
+    }
+  }
+
+  // Reply using the last broadcast channel target
+  function replyToLastChannel() {
+    if (lastChannelTarget !== null) {
+      replyToMessage('broadcast', lastChannelTarget);
+    } else {
+      alert("No broadcast channel target available.");
+    }
+  }
+
+    // Set the incoming sound source and save it in localStorage
+    function setIncomingSound(url) {
+      var soundElem = document.getElementById('incomingSound');
+      if (soundElem) {
+        soundElem.src = url;
+        localStorage.setItem("incomingSoundURL", url);
+    }
+  }
+      // On load, retrieve stored incoming sound URL
+    window.addEventListener("load", function() {
+      var storedSoundURL = localStorage.getItem("incomingSoundURL");
+      if (storedSoundURL) {
+        document.getElementById("soundURL").value = storedSoundURL;
+        setIncomingSound(storedSoundURL);
+      }
+    });
+  </script>
+  <script>
     var hueRotateInterval = null;
     var currentHue = 0;
     function applyThemeColor(color) {
@@ -986,49 +1166,69 @@ def dashboard():
         console.error("Error fetching data:", e);
       }
     }
-    function updateMessagesUI(messages) {
-      messages = messages.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-      var channelDiv = document.getElementById("channelDiv");
-      var dmMessagesDiv = document.getElementById("dmMessagesDiv");
-      if(channelDiv) channelDiv.innerHTML = "";
-      if(dmMessagesDiv) dmMessagesDiv.innerHTML = "";
-      var now = new Date().getTime();
-      messages.forEach(function(m) {
-        var msgTime = new Date(m.timestamp).getTime();
-        var wrap = document.createElement("div");
-        wrap.className = "message" + (m.emergency ? " emergency" : "");
-        if(m.node === "WebUI") {
-          wrap.classList.add("outgoing");
-        }
-        if(m.node !== "WebUI" && m.node !== "AI-Bot" && m.node !== "Home Assistant") {
-          var replyBtn = document.createElement("button");
-          replyBtn.className = "btn";
-          replyBtn.textContent = "Reply";
-          if(m.direct && m.node_id) {
-            replyBtn.onclick = function(){ replyToMessage('direct', m.node_id); };
-          } else if(!m.direct && m.channel_idx !== null) {
-            replyBtn.onclick = function(){ replyToMessage('broadcast', m.channel_idx); };
-          }
-          wrap.appendChild(replyBtn);
-        }
-        if(now - msgTime < 7200000) {
-          wrap.classList.add("newMessage");
-        }
-        var icon = "";
-        if(m.direct) {
-          icon = (m.node === "WebUI") ? "📤" : "📥";
-        } else {
-          icon = (m.node === "WebUI") ? "📣" : "📢";
-        }
-        wrap.innerHTML += "<div class='timestamp'>" + icon + " " + m.timestamp + " | " + m.node + "</div>" +
-                          "<div>" + m.message + "</div>";
-        if(m.direct) {
-          if(dmMessagesDiv) dmMessagesDiv.appendChild(wrap);
-        } else {
-          if(channelDiv) channelDiv.appendChild(wrap);
-        }
-      });
+function updateMessagesUI(messages) {
+  messages = messages.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  
+  // Update global targets from the most recent messages
+  lastDMTarget = null;
+  lastChannelTarget = null;
+  for (var i = 0; i < messages.length; i++) {
+    var m = messages[i];
+    if (m.direct && m.node_id && lastDMTarget === null) {
+      lastDMTarget = m.node_id;
     }
+    if (!m.direct && m.channel_idx !== null && lastChannelTarget === null) {
+      lastChannelTarget = m.channel_idx;
+    }
+  }
+
+  var channelDiv = document.getElementById("channelDiv");
+  var dmMessagesDiv = document.getElementById("dmMessagesDiv");
+  var discordDiv = document.getElementById("discordMessagesDiv");
+  if (channelDiv) channelDiv.innerHTML = "";
+  if (dmMessagesDiv) dmMessagesDiv.innerHTML = "";
+  if (discordDiv) discordDiv.innerHTML = "";
+  var now = new Date().getTime();
+  messages.forEach(function(m) {
+    var msgTime = new Date(m.timestamp).getTime();
+    var wrap = document.createElement("div");
+    wrap.className = "message" + (m.emergency ? " emergency" : "");
+    if (m.node === "WebUI") {
+      wrap.classList.add("outgoing");
+    }
+    if (m.node !== "WebUI" && m.node !== "AI-Bot" && m.node !== "Home Assistant") {
+      var replyBtn = document.createElement("button");
+      replyBtn.className = "btn";
+      replyBtn.textContent = "Reply";
+      if (m.direct && m.node_id) {
+        replyBtn.onclick = function(){ replyToMessage('direct', m.node_id); };
+      } else if (!m.direct && m.channel_idx !== null) {
+        replyBtn.onclick = function(){ replyToMessage('broadcast', m.channel_idx); };
+      }
+      wrap.appendChild(replyBtn);
+    }
+    if (now - msgTime < 7200000) {
+      wrap.classList.add("newMessage");
+    }
+    var icon = "";
+    if (m.direct) {
+      icon = (m.node === "WebUI") ? "📤" : "📥";
+    } else {
+      icon = (m.node === "WebUI") ? "📣" : "📢";
+    }
+    wrap.innerHTML += "<div class='timestamp'>" + icon + " " + m.timestamp + " | " + m.node + "</div>" +
+                       "<div>" + m.message + "</div>";
+    // Place messages based on the node field
+    if (m.node.indexOf("Discord") !== -1) {
+      if (discordDiv) discordDiv.appendChild(wrap);
+    } else if (m.direct) {
+      if (dmMessagesDiv) dmMessagesDiv.appendChild(wrap);
+    } else {
+      if (channelDiv) channelDiv.appendChild(wrap);
+    }
+  });
+}
+
     function updateNodesUI(nodes) {
       var nodeListDiv = document.getElementById("nodeListDiv");
       var destSelect = document.getElementById("destNode");
@@ -1195,6 +1395,10 @@ function dmToNode(nodeId, shortName) {
       </div>
     </div>
   </div>
+        <div class="lcars-panel" style="margin:20px;">
+        <h2>Discord Messages</h2>
+        <div id="discordMessagesDiv"></div>
+      </div>
   <div class="settings-toggle" id="settingsToggle" onclick="toggleSettingsPanel()">Show UI Settings</div>
   <div class="settings-panel" id="settingsPanel">
     <h2>UI Settings</h2>
@@ -1314,11 +1518,30 @@ def connection_status_route():
 
 def main():
     global interface, restart_count, server_start_time, reset_event
-    server_start_time = server_start_time or datetime.now()
+    server_start_time = server_start_time or datetime.now(timezone.utc)
     restart_count += 1
     add_script_log(f"Server restarted. Restart count: {restart_count}")
     print("Starting Meshtastic-AI server...")
     load_archive()
+        # Additional startup info:
+    if ENABLE_DISCORD:
+        print(f"Discord configuration enabled: Inbound channel index: {DISCORD_INBOUND_CHANNEL_INDEX}, Webhook URL is {'set' if DISCORD_WEBHOOK_URL else 'not set'}, Bot Token is {'set' if DISCORD_BOT_TOKEN else 'not set'}, Channel ID is {'set' if DISCORD_CHANNEL_ID else 'not set'}.")
+    else:
+        print("Discord configuration disabled.")
+    if ENABLE_TWILIO:
+        if TWILIO_SID and TWILIO_AUTH_TOKEN and ALERT_PHONE_NUMBER and TWILIO_FROM_NUMBER:
+            print("Twilio is configured for emergency SMS.")
+        else:
+            print("Twilio is not properly configured for emergency SMS.")
+    else:
+        print("Twilio is disabled.")
+    if ENABLE_SMTP:
+        if SMTP_HOST and SMTP_USER and SMTP_PASS and ALERT_EMAIL_TO:
+            print("SMTP is configured for emergency email alerts.")
+        else:
+            print("SMTP is not properly configured for emergency email alerts.")
+    else:
+        print("SMTP is disabled.")
     print("Launching Flask in the background on port 5000...")
     api_thread = threading.Thread(
         target=app.run,
@@ -1326,6 +1549,9 @@ def main():
         daemon=True
     )
     api_thread.start()
+    # If Discord polling is configured, start that thread.
+    if DISCORD_BOT_TOKEN and DISCORD_CHANNEL_ID:
+        threading.Thread(target=poll_discord_channel, daemon=True).start()
     while True:
         try:
             print("---------------------------------------------------")
@@ -1352,7 +1578,6 @@ def main():
             # Inner loop: periodically check if a reset has been signaled
             while not reset_event.is_set():
                 time.sleep(1)
-            # When reset_event is set, force an OSError to break out of the loop
             raise OSError("Reset event triggered due to connection loss")
         except KeyboardInterrupt:
             print("User interrupted the script. Shutting down.")
@@ -1387,7 +1612,48 @@ def connection_monitor(initial_delay=30):
         time.sleep(5)
 
 # Start the watchdog thread after 20 seconds to give node a chance to connect
-threading.Thread(target=connection_monitor, args=(20,), daemon=True).start()  # 20 seconds delay
+def poll_discord_channel():
+    """Polls the Discord channel for new messages using the Discord API."""
+    # Wait a short period for interface to be set up
+    time.sleep(5)
+    last_message_id = None
+    headers = {"Authorization": f"Bot {DISCORD_BOT_TOKEN}"}
+    url = f"https://discord.com/api/v9/channels/{DISCORD_CHANNEL_ID}/messages"
+    while True:
+        try:
+            params = {"limit": 10}
+            if last_message_id:
+                params["after"] = last_message_id
+            response = requests.get(url, headers=headers, params=params)
+            if response.status_code == 200:
+                msgs = response.json()
+                msgs = sorted(msgs, key=lambda m: int(m["id"]))
+                for msg in msgs:
+                    if msg["author"].get("bot"):
+                        continue
+                    # Only process messages that arrived after the script started
+                    if last_message_id is None:
+                        msg_timestamp_str = msg.get("timestamp")
+                        if msg_timestamp_str:
+                            msg_time = datetime.fromisoformat(msg_timestamp_str.replace("Z", "+00:00"))
+                            if msg_time < server_start_time:
+                                continue
+                    username = msg["author"].get("username", "DiscordUser")
+                    content = msg.get("content")
+                    if content:
+                        formatted = f"**{username}**: {content}"
+                        log_message("DiscordPoll", formatted, direct=False, channel_idx=DISCORD_INBOUND_CHANNEL_INDEX)
+                        if interface is None:
+                            print("❌ Cannot send polled Discord message: interface is None.")
+                        else:
+                            send_broadcast_chunks(interface, formatted, DISCORD_INBOUND_CHANNEL_INDEX)
+                        print(f"Polled and routed Discord message: {formatted}")
+                        last_message_id = msg["id"]
+            else:
+                print(f"Discord poll error: {response.status_code} {response.text}")
+        except Exception as e:
+            print(f"Error polling Discord: {e}")
+        time.sleep(10)
 
 if __name__ == "__main__":
     while True:
