@@ -95,7 +95,7 @@ BANNER = (
 ██║ ╚═╝ ██║███████╗███████║██║  ██║   ██║   ██║  ██║███████║   ██║   ██║╚██████╗              ██║  ██║██║
 ╚═╝     ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝ ╚═════╝              ╚═╝  ╚═╝╚═╝
     
-Meshtastic-AI Alpha v0.4.0 by: MR_TBOT (https://mr-tbot.com)
+Meshtastic-AI Alpha v0.4.0 TESTING BRANCH by: MR_TBOT (https://mr-tbot.com)
 https://github.com/mr-tbot/meshtastic-ai/
     \033[32m 
 Messaging Dashboard Access: http://localhost:5000/dashboard \033[38;5;214m
