@@ -306,7 +306,7 @@ Your `config.json` file controls almost every aspect of Meshtastic-AI. Below is 
 ## Installation Guide
 
 ### A) Prerequisites
-- **Windows PC:** A machine running Windows.
+- **Windows or Linux PC:** A machine running Windows or Linux (macOS likely as well) - including Raspberry Pi & Linux based ARM architectures!  - Linux instructions soon!
 - **Meshtastic Device:** An ESP‑based node (via USB, WiFi, or TCP).
 - **Python 3.13+:** Download from [python.org](https://www.python.org/downloads/). Make sure “Add Python to PATH” is checked.
 - **Dependencies:** See `requirements.txt` (includes packages like `meshtastic`, `requests`, `Flask`, `twilio`, etc.).
