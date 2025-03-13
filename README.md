@@ -130,7 +130,7 @@
   - Email Subject now includes the long name, short name & Node ID of the sending node, rather than just the Node ID.
 - **Docker Support**  
   - Thanks @clendaniel - Who was kind enough to generate a Dockerfile & docker-compose.yaml for the project!
-  - 
+  
 ---
 
 ## Quick Start (Windows)
