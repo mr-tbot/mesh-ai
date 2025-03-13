@@ -95,7 +95,7 @@ BANNER = (
 ██║ ╚═╝ ██║███████╗███████║██║  ██║   ██║   ██║  ██║███████║   ██║   ██║╚██████╗              ██║  ██║██║
 ╚═╝     ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝ ╚═════╝              ╚═╝  ╚═╝╚═╝
     
-Meshtastic-AI Alpha v0.4.0 by: MR_TBOT (https://mr-tbot.com)
+Meshtastic-AI Alpha v0.4.1 by: MR_TBOT (https://mr-tbot.com)
 https://github.com/mr-tbot/meshtastic-ai/
     \033[32m 
 Messaging Dashboard Access: http://localhost:5000/dashboard \033[38;5;214m
@@ -341,7 +341,7 @@ def send_broadcast_chunks(interface, text, channelIndex):
             print(f"❌ Error sending broadcast chunk: {e}")
             if isinstance(e, OSError) and getattr(e, 'errno', None) in (10053, 10054, 10060):
                 reset_event.set()
-            raise
+            break
         else:
             info_print(f"[Info] Successfully sent chunk {i+1}/{len(chunks)} on ch={channelIndex}.")
 
@@ -366,7 +366,7 @@ def send_direct_chunks(interface, text, destinationId):
             print(f"❌ Error sending direct chunk: {e}")
             if isinstance(e, OSError) and getattr(e, 'errno', None) in (10053, 10054, 10060):
                 reset_event.set()
-            raise
+            break
         else:
             info_print(f"[Info] Direct chunk {i+1}/{len(chunks)} to {destinationId} sent.")
 
@@ -542,7 +542,7 @@ def send_emergency_notification(node_id, user_msg, lat=None, lon=None, position_
             else:
                 email_to = ALERT_EMAIL_TO
             msg = MIMEText(full_msg)
-            msg["Subject"] = f"EMERGENCY ALERT from Node {node_id}"
+            msg["Subject"] = f"EMERGENCY ALERT from {sn} ({fullname}) [Node {node_id}]"
             msg["From"] = SMTP_USER
             msg["To"] = email_to
             if SMTP_PORT == 465:
@@ -758,9 +758,11 @@ def on_receive(packet=None, interface=None, **kwargs):
             global connection_status
             connection_status = "Disconnected"
             reset_event.set()
-        raise
+        # Instead of re-raising, simply return to prevent thread crash
+        return
     except Exception as e:
         print(f"⚠️ Unexpected error in on_receive: {e}")
+        return
 
 @app.route("/messages", methods=["GET"])
 def get_messages_api():
