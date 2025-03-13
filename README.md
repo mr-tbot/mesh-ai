@@ -39,7 +39,7 @@
 - **Discord Integration Enhancements**  
   - Route messages to and from Discord.
   - New configuration options and a dedicated `/discord_webhook` endpoint allow for inbound Discord message processing.
-- **Windows‑Focused with Planned Linux/macOS Support**  
+- **Windows‑Focused - Linux compatability confirmed!  Thanks Milo Oh!
   - Official support for Windows environments with installation guides; instructions for Linux/macOS are coming soon.
 
 ---
@@ -128,6 +128,9 @@
   - Trying a new method to handle WinError exceptions - which though much improved in v0.4.0 - still occur under the right connection circumstances - especially over Wi-Fi.
 - **Emergency Email Subject:**  
   - Email Subject now includes the long name, short name & Node ID of the sending node, rather than just the Node ID.
+- **Docker Support**  
+  - Thanks @clendaniel - Who was kind enough to generate a Dockerfile & docker-compose.yaml for the project!
+  - 
 ---
 
 ## Quick Start (Windows)
