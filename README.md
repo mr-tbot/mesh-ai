@@ -137,7 +137,7 @@
 2. **Install Dependencies:**  
    - Create a virtual environment:
      ```bash
-     cd path\to\meshtastic-ai
+     cd path\to\meshtastic_ai
      python -m venv venv
      venv\Scripts\activate
      ```
@@ -151,7 +151,7 @@
 4. **Start the Bot:**  
    - Run the bot by double‑clicking `Run Mesh-AI - Windows.bat` or by executing:
      ```bash
-     python meshtastic-ai.py
+     python meshtastic_ai.py
      ```
 5. **Access the WebUI Dashboard:**  
    - Open your browser and navigate to [http://localhost:5000/dashboard](http://localhost:5000/dashboard).
