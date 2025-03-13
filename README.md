@@ -365,7 +365,7 @@ Your `config.json` file controls almost every aspect of Meshtastic-AI. Below is 
 ## Contributing & Disclaimer
 
 - **Alpha Software Notice:**  
-  This release (v0.4.0) is experimental. Expect bugs and changes that might affect existing features. Thorough field testing is recommended before production use.
+  This release (v0.4.1) is experimental. Expect bugs and changes that might affect existing features. Thorough field testing is recommended before production use.
 - **Feedback & Contributions:**  
   Report issues or submit pull requests on GitHub. Your input is invaluable.
 - **Use Responsibly:**  
@@ -375,7 +375,7 @@ Your `config.json` file controls almost every aspect of Meshtastic-AI. Below is 
 
 ## Conclusion
 
-Meshtastic-AI Alpha v0.4.0 takes the solid foundation of v0.3.0 and introduces significant improvements in logging, error handling, Discord integration, and emergency alert routing. Whether you’re chatting directly with your node, integrating with Home Assistant, or leveraging multi‑channel alerting (Twilio, Email, Discord), this release offers a more comprehensive and reliable off‑grid AI assistant experience.
+Meshtastic-AI Alpha v0.4.1 takes the solid foundation of v0.3.0 and introduces significant improvements in logging, error handling, Discord integration, and emergency alert routing. Whether you’re chatting directly with your node, integrating with Home Assistant, or leveraging multi‑channel alerting (Twilio, Email, Discord), this release offers a more comprehensive and reliable off‑grid AI assistant experience.
 
 **Enjoy tinkering, stay safe, and have fun!**  
 Please share your feedback or join our community on GitHub.
