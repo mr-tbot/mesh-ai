@@ -1,4 +1,4 @@
-# Meshtastic-AI (Alpha v0.4.0)
+# Meshtastic-AI (Alpha v0.4.1) - (Available through GIT pull until ready for full release)
 
 ![image](https://github.com/user-attachments/assets/7250e722-3f7e-49f2-9439-9b8ad75a1981)
 
@@ -123,6 +123,11 @@
 - **Code Refactoring:**  
   - Overall code improvements for maintainability and clarity, with additional debug prints for troubleshooting.
 
+### New Updates in v0.4.0 → v0.4.1
+- **Error Handling (ongoing):**  
+  - Trying a new method to handle WinError exceptions - which though much improved in v0.4.0 - still occur under the right connection circumstances - especially over Wi-Fi.
+- **Emergency Email Subject:**  
+  - Email Subject now includes the long name, short name & Node ID of the sending node, rather than just the Node ID.
 ---
 
 ## Quick Start (Windows)
