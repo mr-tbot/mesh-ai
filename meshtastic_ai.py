@@ -339,7 +339,9 @@ def send_broadcast_chunks(interface, text, channelIndex):
             time.sleep(CHUNK_DELAY)
         except Exception as e:
             print(f"❌ Error sending broadcast chunk: {e}")
-            if isinstance(e, OSError) and getattr(e, 'errno', None) in (10053, 10054, 10060):
+            # Check both errno and winerror for known connection errors
+            error_code = getattr(e, 'errno', None) or getattr(e, 'winerror', None)
+            if error_code in (10053, 10054, 10060):
                 reset_event.set()
             break
         else:
@@ -364,7 +366,8 @@ def send_direct_chunks(interface, text, destinationId):
             time.sleep(CHUNK_DELAY)
         except Exception as e:
             print(f"❌ Error sending direct chunk: {e}")
-            if isinstance(e, OSError) and getattr(e, 'errno', None) in (10053, 10054, 10060):
+            error_code = getattr(e, 'errno', None) or getattr(e, 'winerror', None)
+            if error_code in (10053, 10054, 10060):
                 reset_event.set()
             break
         else:
@@ -751,9 +754,9 @@ def on_receive(packet=None, interface=None, **kwargs):
             else:
                 send_broadcast_chunks(interface, resp, ch_idx)
     except OSError as e:
-        CONNECTION_ERRORS = {10054, 10053, 10060}
-        print(f"⚠️ OSError detected in on_receive: {e}")
-        if getattr(e, 'errno', None) in CONNECTION_ERRORS:
+        error_code = getattr(e, 'errno', None) or getattr(e, 'winerror', None)
+        print(f"⚠️ OSError detected in on_receive: {e} (error code: {error_code})")
+        if error_code in (10053, 10054, 10060):
             print("⚠️ Connection error detected. Restarting interface...")
             global connection_status
             connection_status = "Disconnected"
@@ -1586,9 +1589,10 @@ def main():
             add_script_log("Server shutdown via KeyboardInterrupt.")
             break
         except OSError as e:
-            if isinstance(e, OSError) and getattr(e, 'errno', None) in (10053, 10054, 10060):
+            error_code = getattr(e, 'errno', None) or getattr(e, 'winerror', None)
+            if error_code in (10053, 10054, 10060):
                 print("⚠️ Connection was forcibly closed. Attempting to reconnect...")
-                add_script_log(f"Connection forcibly closed: {e}")
+                add_script_log(f"Connection forcibly closed: {e} (error code: {error_code})")
                 time.sleep(5)
                 reset_event.clear()
                 continue
