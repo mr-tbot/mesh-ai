@@ -524,6 +524,18 @@ Update your configuration file with the following keys (replace placeholder text
 
 ---
 
+## Donations are GRACIOUSLY accepted to stoke development!
+- **PayPal:**  
+  https://www.paypal.com/ncp/payment/XPW23EP9XHMYS
+- **BTC:**  
+  bc1qcfstyxaktw5ppnsm5djmpvmgv49z0cp6df33tl
+- **XRP:**  
+  TrpgvB8EgTtqhU1W6XJAvx3CS8KKkRwTLHc
+- **DOGE:**  
+  D5MyXVRkwLW9XzcKjjcwEHcXvnaTFueZhy
+
+---
+
 ## Conclusion
 
 Meshtastic-AI Alpha v0.4.2 takes the solid foundation of v0.4.0 and introduces significant improvements in logging, error handling, Discord integration, and emergency alert routing. Whether you’re chatting directly with your node, integrating with Home Assistant, or leveraging multi‑channel alerting (Twilio, Email, Discord), this release offers a more comprehensive and reliable off‑grid AI assistant experience.
