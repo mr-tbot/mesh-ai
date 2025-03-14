@@ -347,10 +347,6 @@ Your `config.json` file controls almost every aspect of Meshtastic-AI. Below is 
 
 ---
 
-Below is an extended documentation section covering Email integration, Discord bot setup, and Twilio configuration, along with reminders of other important settings. You can add this to your README or configuration documentation:
-
----
-
 ## Home Assistant & LLM API Integration
 
 ### Home Assistant Integration
