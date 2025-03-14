@@ -394,6 +394,9 @@ Your `config.json` file controls almost every aspect of Meshtastic-AI. Below is 
 
 ### Discord Integration: Detailed Setup & Permissions
 
+![483177250_1671387500130340_6790017825443843758_n](https://github.com/user-attachments/assets/0042b7a9-8ec9-4492-8668-25ac977a74cd)
+
+
 #### 1. Create a Discord Bot
 - **Access the Developer Portal:**  
   Go to the [Discord Developer Portal](https://discord.com/developers/applications) and sign in with your Discord account.
