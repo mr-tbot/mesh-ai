@@ -136,7 +136,7 @@
 ### New Updates in v0.4.1 → v0.4.2
 - **Initial Ubuntu & Ollama Unidecode Support: -**  
   - User @milo_o - Thank you so much!  I have merged your idea into the main branch - hoping this works as expected for users - please report any problems!  -  https://github.com/mr-tbot/meshtastic-ai/discussions/19
-  - **Emergency Email Google Maps Link:**  
+- **Emergency Email Google Maps Link:**  
   - Emergency email now includes a Google Maps link to the sender's location, rather than just coordinates. - Great call, @Nlantz79!  (Remember - this is only as accurate as the sender node's location precision allows!)
 ---
 
