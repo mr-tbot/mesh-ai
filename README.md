@@ -166,8 +166,6 @@
 5. **Access the WebUI Dashboard:**  
    - Open your browser and navigate to [http://localhost:5000/dashboard](http://localhost:5000/dashboard).
 
-Below is the updated Quick Start guide for Ubuntu/Linux with a virtual environment named **mesh-ai**:
-
 ---
 
 ## Quick Start (Ubuntu / Linux)
@@ -209,8 +207,6 @@ Below is the updated Quick Start guide for Ubuntu/Linux with a virtual environme
    - Open your browser and navigate to [http://localhost:5000/dashboard](http://localhost:5000/dashboard).
 
 ---
-
-This guide uses a virtual environment named **mesh-ai** to keep your dependencies isolated. Enjoy using Meshtastic-AI!
 
 ![Screenshot 2025-03-07 051915](https://github.com/user-attachments/assets/bc58baf4-5cfa-40e5-8086-58d24afd311c)
 
