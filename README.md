@@ -166,6 +166,52 @@
 5. **Access the WebUI Dashboard:**  
    - Open your browser and navigate to [http://localhost:5000/dashboard](http://localhost:5000/dashboard).
 
+Below is the updated Quick Start guide for Ubuntu/Linux with a virtual environment named **mesh-ai**:
+
+---
+
+## Quick Start (Ubuntu / Linux)
+
+1. **Download/Clone**  
+   - Clone the repository or copy the **meshtastic-ai** folder to your preferred directory:
+     ```bash
+     git clone https://github.com/mr-tbot/meshtastic-ai.git
+     cd meshtastic-ai
+     ```
+
+2. **Create and Activate a Virtual Environment Named `mesh-ai`:**  
+   - Create the virtual environment:
+     ```bash
+     python3 -m venv mesh-ai
+     ```
+   - Activate the virtual environment:
+     ```bash
+     source mesh-ai/bin/activate
+     ```
+
+3. **Install Dependencies:**  
+   - Upgrade pip and install the required packages:
+     ```bash
+     pip install --upgrade pip
+     pip install -r requirements.txt
+     ```
+
+4. **Configure Files:**  
+   - Edit `config.json`, `commands_config.json`, and `motd.json` as needed. Refer to the **Configuration** section in the documentation for details.
+
+5. **Start the Bot:**  
+   - Run the bot by executing:
+     ```bash
+     python meshtastic_ai.py
+     ```
+
+6. **Access the WebUI Dashboard:**  
+   - Open your browser and navigate to [http://localhost:5000/dashboard](http://localhost:5000/dashboard).
+
+---
+
+This guide uses a virtual environment named **mesh-ai** to keep your dependencies isolated. Enjoy using Meshtastic-AI!
+
 ![Screenshot 2025-03-07 051915](https://github.com/user-attachments/assets/bc58baf4-5cfa-40e5-8086-58d24afd311c)
 
 
