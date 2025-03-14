@@ -16,6 +16,7 @@ from flask import Flask, request, jsonify, redirect, url_for
 import sys
 import socket  # for socket error checking
 from twilio.rest import Client  # for Twilio SMS support
+from unidecode import unidecode   # Added unidecode import for Ollama text normalization
 
 # -----------------------------
 # Verbose Logging Setup
@@ -94,8 +95,8 @@ BANNER = (
 ██║╚██╔╝██║██╔══╝  ╚════██║██╔══██║   ██║   ██╔══██║╚════██║   ██║   ██║██║         ╚════╝    ██╔══██║██║
 ██║ ╚═╝ ██║███████╗███████║██║  ██║   ██║   ██║  ██║███████║   ██║   ██║╚██████╗              ██║  ██║██║
 ╚═╝     ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝ ╚═════╝              ╚═╝  ╚═╝╚═╝
-    
-Meshtastic-AI Alpha v0.4.1 by: MR_TBOT (https://mr-tbot.com)
+
+Meshtastic-AI Alpha v0.4.2 by: MR_TBOT (https://mr-tbot.com)
 https://github.com/mr-tbot/meshtastic-ai/
     \033[32m 
 Messaging Dashboard Access: http://localhost:5000/dashboard \033[38;5;214m
@@ -441,17 +442,20 @@ def send_to_openai(user_message):
 def send_to_ollama(user_message):
     dprint(f"send_to_ollama: user_message='{user_message}'")
     info_print("[Info] Routing user message to Ollama...")
+    # Normalize text for non-ASCII characters using unidecode
+    user_message = unidecode(user_message)
     combined_prompt = f"{SYSTEM_PROMPT}\n{user_message}"
     payload = {
         "prompt": combined_prompt,
-        "model": OLLAMA_MODEL
+        "model": OLLAMA_MODEL,
+        "stream": False  # Added to disable streaming responses
     }
     try:
         r = requests.post(OLLAMA_URL, json=payload, timeout=OLLAMA_TIMEOUT)
         if r.status_code == 200:
             jr = r.json()
             dprint(f"Ollama raw => {jr}")
-            return jr.get("generated_text", "🤖 [No response]")[:MAX_RESPONSE_LENGTH]
+            return jr.get("response", "🤖 [No response]")[:MAX_RESPONSE_LENGTH]
         else:
             print(f"⚠️ Ollama error: {r.status_code} => {r.text}")
             return None
@@ -516,7 +520,8 @@ def send_emergency_notification(node_id, user_msg, lat=None, lon=None, position_
     fullname = get_node_fullname(node_id)
     full_msg = f"EMERGENCY from {sn} ({fullname}) [Node {node_id}]:\n"
     if lat is not None and lon is not None:
-        full_msg += f" - GPS: {lat}, {lon}\n"
+        maps_url = f"https://www.google.com/maps/search/?api=1&query={lat},{lon}"
+        full_msg += f" - Location: {maps_url}\n"
     if position_time:
         full_msg += f" - Last GPS time: {position_time}\n"
     if user_msg:
