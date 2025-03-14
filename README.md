@@ -41,7 +41,7 @@
   - Route messages to and from Discord.
   - New configuration options and a dedicated `/discord_webhook` endpoint allow for inbound Discord message processing.
 - **Windows‑Focused - Linux compatability confirmed!  Thanks Milo Oh!
-  - Official support for Windows environments with installation guides; instructions for Linux/macOS are coming soon.
+  - Official support for Windows environments with installation guides; instructions for Linux availble now - MacOS coming soon!
 
 ---
 
@@ -345,45 +345,9 @@ Your `config.json` file controls almost every aspect of Meshtastic-AI. Below is 
 }
 ```
 
-*Key new options include:*  
-- **Discord Settings:** For routing messages to/from Discord.  
-- **Enhanced Emergency Routing:** Including support for multiple channels (Twilio, SMTP, Discord).  
-- **Improved Logging:** With UTC‑based timestamps and auto‑truncation.
-
 ---
 
-## Installation Guide
-
-### A) Prerequisites
-- **Windows or Linux PC:** A machine running Windows or Linux (macOS likely as well) - including Raspberry Pi & Linux based ARM architectures!  - Linux instructions soon!
-- **Meshtastic Device:** An ESP‑based node (via USB, WiFi, or TCP).  **Make sure all MQTT features are turned off to avoid overwhelming your Node & causing connection errors.
-- **Python 3.13+:** Download from [python.org](https://www.python.org/downloads/). Make sure “Add Python to PATH” is checked.
-- **Dependencies:** See `requirements.txt` (includes packages like `meshtastic`, `requests`, `Flask`, `twilio`, etc.).
-
-### B) Download & Setup
-1. **Obtain the Source:**  
-   - Clone the repository from [GitHub](https://github.com/mr-tbot/meshtastic-ai) or copy the **meshtastic-ai** folder.
-2. **Create a Virtual Environment (Recommended):**
-   ```bash
-   cd path\to\meshtastic-ai
-   python -m venv venv
-   venv\Scripts\activate
-   ```
-3. **Install Dependencies:**
-   ```bash
-   pip install --upgrade pip
-   pip install -r requirements.txt
-   ```
-4. **Configure Your Files:**  
-   - Edit `config.json`, `commands_config.json`, and `motd.json` as needed.
-
-### C) Running the Bot
-1. **Start the Bot:**  
-   - Double‑click `Run Mesh-AI - Windows.bat` or run `python meshtastic-ai.py` directly.
-2. **Monitor the Console:**  
-   - Logs will show connection attempts, AI responses, and any errors.
-3. **Access the WebUI:**  
-   - Open [http://localhost:5000/dashboard](http://localhost:5000/dashboard) in your browser.
+Below is an extended documentation section covering Email integration, Discord bot setup, and Twilio configuration, along with reminders of other important settings. You can add this to your README or configuration documentation:
 
 ---
 
@@ -411,10 +375,147 @@ Your `config.json` file controls almost every aspect of Meshtastic-AI. Below is 
 
 ---
 
+## Communication Integrations
+
+### Email Integration
+- **Enable Email Alerts:**  
+  - Set `"enable_smtp": true` in `config.json`.
+- **Configure SMTP:**  
+  - Provide the following settings in `config.json`:
+    - `"smtp_host"` (e.g., `smtp.gmail.com`)
+    - `"smtp_port"` (use `465` for SSL or another port for TLS)
+    - `"smtp_user"` (your email address)
+    - `"smtp_pass"` (your email password or app-specific password)
+    - `"alert_email_to"` (recipient email address or list of addresses)
+- **Behavior:**  
+  - Emergency emails include a clickable Google Maps link (generated from available GPS data) so recipients can quickly view the sender’s location.
+- **Note:**  
+  - Ensure your SMTP settings are allowed by your email provider (for example, Gmail may require an app password and proper security settings).
+
+---
+
+### Discord Integration: Detailed Setup & Permissions
+
+#### 1. Create a Discord Bot
+- **Access the Developer Portal:**  
+  Go to the [Discord Developer Portal](https://discord.com/developers/applications) and sign in with your Discord account.
+- **Create a New Application:**  
+  Click on "New Application," give it a name (e.g., *Meshtastic-AI Bot*), and confirm.
+- **Add a Bot to Your Application:**  
+  - Select your application, then navigate to the **Bot** tab on the left sidebar.  
+  - Click on **"Add Bot"** and confirm by clicking **"Yes, do it!"**  
+  - Customize your bot’s username and icon if desired.
+
+#### 2. Set Up Bot Permissions
+- **Required Permissions:**  
+  Your bot needs a few basic permissions to function correctly:
+  - **View Channels:** So it can see messages in the designated channels.
+  - **Send Messages:** To post responses and emergency alerts.
+  - **Read Message History:** For polling messages from a channel (if polling is enabled).
+  - **Manage Messages (Optional):** If you want the bot to delete or manage messages.
+- **Permission Calculator:**  
+  Use a tool like [Discord Permissions Calculator](https://discordapi.com/permissions.html) to generate the correct permission integer.  
+  For minimal functionality, a permission integer of **3072** (which covers "Send Messages," "View Channels," and "Read Message History") is often sufficient.
+
+#### 3. Invite the Bot to Your Server
+- **Generate an Invite Link:**  
+  Replace `YOUR_CLIENT_ID` with your bot’s client ID (found in the **General Information** tab) in the following URL:
+  ```url
+  https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=3072&scope=bot
+  ```
+- **Invite the Bot:**  
+  Open the link in your browser, select the server where you want to add the bot, and authorize it. Make sure you have the “Manage Server” permission in that server.
+
+#### 4. Configure Bot Credentials in `config.json`
+Update your configuration file with the following keys (replace placeholder text with your actual values):
+```json
+{
+  "enable_discord": true,
+  "discord_webhook_url": "YOUR_DISCORD_WEBHOOK_URL",
+  "discord_receive_enabled": true,
+  "discord_bot_token": "YOUR_BOT_TOKEN",
+  "discord_channel_id": "YOUR_CHANNEL_ID",
+  "discord_inbound_channel_index": 1,  // or the channel number you prefer
+  "discord_send_ai": true,
+  "discord_send_emergency": true
+}
+```
+- **discord_webhook_url:**  
+  Create a webhook in your desired Discord channel (Channel Settings → Integrations → Webhooks) and copy its URL.
+- **discord_bot_token & discord_channel_id:**  
+  Copy your bot’s token from the Developer Portal and enable message polling by specifying the channel ID where the bot should read messages.  
+  To get a channel ID, enable Developer Mode in Discord (User Settings → Advanced → Developer Mode) then right-click the channel and select "Copy ID."
+
+#### 5. Polling Integration (Optional)
+- **Enable Message Polling:**  
+  Set `"discord_receive_enabled": true` to allow the bot to poll for new messages.
+- **Routing:**  
+  The configuration key `"discord_inbound_channel_index"` determines the channel number used by Meshtastic-AI for routing incoming Discord messages. Make sure it matches your setup.
+
+#### 6. Testing Your Discord Setup
+- **Restart Meshtastic-AI:**  
+  With the updated configuration, restart your bot.
+- **Check Bot Activity:**  
+  Verify that the bot is present in your server, that it can see messages in the designated channel, and that it can send responses.  
+- **Emergency Alerts & AI Responses:**  
+  Confirm that emergency alerts and AI responses are being posted in Discord as per your configuration (`"discord_send_ai": true` and `"discord_send_emergency": true`).
+
+#### 7. Troubleshooting Tips
+- **Permissions Issues:**  
+  If the bot isn’t responding or reading messages, double-check that its role on your server has the required permissions.
+- **Channel IDs & Webhook URLs:**  
+  Verify that you’ve copied the correct channel IDs and webhook URLs (ensure no extra spaces or formatting issues).
+- **Bot Token Security:**  
+  Keep your bot token secure. If it gets compromised, regenerate it immediately from the Developer Portal.
+
+---
+
+### Twilio Integration
+- **Enable Twilio:**  
+  - Set `"enable_twilio": true` in `config.json`.
+- **Configure Twilio Credentials:**  
+  - Provide your Twilio settings in `config.json`:
+    - `"twilio_sid": "YOUR_TWILIO_SID"`
+    - `"twilio_auth_token": "YOUR_TWILIO_AUTH_TOKEN"`
+    - `"twilio_from_number": "YOUR_TWILIO_PHONE_NUMBER"`
+    - `"alert_phone_number": "DESTINATION_PHONE_NUMBER"` (the number to receive emergency SMS)
+- **Usage:**  
+  - When an emergency is triggered, the bot sends an SMS containing the alert message (with a Google Maps link if GPS data is available).
+- **Tip:**  
+  - Follow [Twilio's setup guide](https://www.twilio.com/docs/usage/tutorials/how-to-use-your-free-trial-account) to obtain your SID and Auth Token, and ensure that your phone numbers are verified.
+
+---
+
+## Other Important Settings
+
+- **Logging & Archives:**  
+  - Script logs are stored in `script.log` and message logs in `messages.log`.
+  - An archive is maintained in `messages_archive.json` to keep recent messages.
+  
+- **Device Connection:**  
+  - Configure the connection method for your Meshtastic device by setting either the `"serial_port"` or enabling `"use_wifi"` along with `"wifi_host"` and `"wifi_port"`.  
+  - Alternatively, enable `"use_mesh_interface"` if applicable.
+  
+- **Message Routing & Commands:**  
+  - Custom commands can be added in `commands_config.json`.
+  - The WebUI Dashboard (accessible at [http://localhost:5000/dashboard](http://localhost:5000/dashboard)) displays messages and node status.
+  
+- **AI Provider Settings:**  
+  - Adjust `"ai_provider"` and related API settings (timeouts, models, etc.) for LM Studio, OpenAI, Ollama, or Home Assistant integration.
+  
+- **Security:**  
+  - If using Home Assistant with PIN protection, follow the specified format (`PIN=XXXX your message`) to ensure messages are accepted.
+  
+- **Testing:**  
+  - You can test SMS sending with the `/sms` command or trigger an emergency alert to confirm that Twilio and email integrations are functioning.
+
+---
+
+
 ## Contributing & Disclaimer
 
 - **Alpha Software Notice:**  
-  This release (v0.4.1) is experimental. Expect bugs and changes that might affect existing features. Thorough field testing is recommended before production use.
+  This release (v0.4.2) is experimental. Expect bugs and changes that might affect existing features. Thorough field testing is recommended before production use.
 - **Feedback & Contributions:**  
   Report issues or submit pull requests on GitHub. Your input is invaluable.
 - **Use Responsibly:**  
@@ -424,7 +525,7 @@ Your `config.json` file controls almost every aspect of Meshtastic-AI. Below is 
 
 ## Conclusion
 
-Meshtastic-AI Alpha v0.4.1 takes the solid foundation of v0.3.0 and introduces significant improvements in logging, error handling, Discord integration, and emergency alert routing. Whether you’re chatting directly with your node, integrating with Home Assistant, or leveraging multi‑channel alerting (Twilio, Email, Discord), this release offers a more comprehensive and reliable off‑grid AI assistant experience.
+Meshtastic-AI Alpha v0.4.2 takes the solid foundation of v0.4.0 and introduces significant improvements in logging, error handling, Discord integration, and emergency alert routing. Whether you’re chatting directly with your node, integrating with Home Assistant, or leveraging multi‑channel alerting (Twilio, Email, Discord), this release offers a more comprehensive and reliable off‑grid AI assistant experience.
 
 **Enjoy tinkering, stay safe, and have fun!**  
 Please share your feedback or join our community on GitHub.
