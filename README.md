@@ -1,6 +1,7 @@
-# Meshtastic-AI (Alpha v0.4.1) - (Available through GIT pull until ready for full release)
+# Meshtastic-AI (Alpha v0.4.2)
 
-![image](https://github.com/user-attachments/assets/7250e722-3f7e-49f2-9439-9b8ad75a1981)
+![image](https://github.com/user-attachments/assets/aa75b71a-b534-4e8c-983d-f67d73a73f5b)
+
 
 **Meshtastic-AI** (MESH-AI for short) is an experimental project that bridges [Meshtastic](https://meshtastic.org/) LoRa mesh networks with powerful AI chatbots. This release builds on the previous Alpha v0.3.0 version by introducing a major WebUI overhaul, enhanced error handling with UTC‑based logging, refined command processing (including case‑insensitivity), and expanded integrations for emergency notifications via Twilio, SMTP email, and Discord. You can choose between local models (LM Studio, Ollama), OpenAI, or even integrate with Home Assistant for off‑grid AI assistance.
 
@@ -131,7 +132,12 @@
   - Email Subject now includes the long name, short name & Node ID of the sending node, rather than just the Node ID.
 - **Docker Support**  
   - Thanks @clendaniel - Who was kind enough to generate a Dockerfile & docker-compose.yaml for the project!
-  
+
+### New Updates in v0.4.1 → v0.4.2
+- **Initial Ubuntu & Ollama Unidecode Support: -**  
+  - User @milo_o - Thank you so much!  I have merged your idea into the main branch - hoping this works as expected for users - please report any problems!  -  https://github.com/mr-tbot/meshtastic-ai/discussions/19
+  - **Emergency Email Google Maps Link:**  
+  - Emergency email now includes a Google Maps link to the sender's location, rather than just coordinates. - Great call, @Nlantz79!  (Remember - this is only as accurate as the sender node's location precision allows!)
 ---
 
 ## Quick Start (Windows)
