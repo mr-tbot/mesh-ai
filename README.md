@@ -125,7 +125,8 @@
 
 ### New Updates in v0.4.0 → v0.4.1
 - **Error Handling (ongoing):**  
-  - Trying a new method to handle WinError exceptions - which though much improved in v0.4.0 - still occur under the right connection circumstances - especially over Wi-Fi.
+  - Trying a new method to handle WinError exceptions - which though much improved in v0.4.0 - still occur under the right connection circumstances - especially over Wi-Fi.  
+     (UPDATE: My WinError issues were being caused by a combination of low solar power, and MQTT being enabled on my node.  MQTT - especially using LongFast is very intense on a node, and can cause abrupt connection restarts as noted here:  https://github.com/meshtastic/meshtastic/pull/901 - but - now the script is super robust regardless for handling errors!
 - **Emergency Email Subject:**  
   - Email Subject now includes the long name, short name & Node ID of the sending node, rather than just the Node ID.
 - **Docker Support**  
