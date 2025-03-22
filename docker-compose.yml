@@ -1,7 +1,7 @@
 version: '3.7'
 services:
   meshtastic-ai:
-    image: meshtastic-ai:latest
+    image: ghcr.io/nerdscorp/meshtastic-ai
     ports:
       - 5000:5000
     volumes:
