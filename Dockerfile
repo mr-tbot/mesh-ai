@@ -8,11 +8,11 @@ USER root
 # Set working directory
 WORKDIR /app
 
-# Copy only required files first
-COPY meshtastic_ai.py requirements.txt /app/
-
-# Then copy everything else
+# Copy files explicitly
 COPY . /app/
+
+# List files after copying (for debugging)
+RUN ls -l /app
 
 # Install dependencies
 RUN pip install --no-cache-dir -r /app/requirements.txt
@@ -20,5 +20,5 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 # Expose port 5000
 EXPOSE 5000
 
-# Run the script
+# Set the default command
 CMD ["python", "/app/meshtastic_ai.py"]
