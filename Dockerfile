@@ -1,7 +1,11 @@
+# Use Python latest image
 FROM python:latest
 LABEL Maintainer="mr-tbot"
 
-# Install necessary packages and upgrade pip
+# Set user to root
+USER root
+
+# Install necessary dependencies
 RUN apt-get update && apt-get install -y python3-pip && rm -rf /var/lib/apt/lists/*
 RUN pip3 install --no-cache-dir --upgrade pip
 
