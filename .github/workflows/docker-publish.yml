@@ -24,8 +24,8 @@ jobs:
 
       - name: Build Docker Image
         run: |
-          docker build -t ghcr.io/${{ github.repository_owner }}/meshtastic-ai:latest .
+          docker build -t ghcr.io/nerdscorp/meshtastic-ai:latest .
 
       - name: Push Docker Image
         run: |
-          docker push ghcr.io/${{ github.repository_owner }}/meshtastic-ai:latest
+          docker push ghcr.io/nerdscorp/meshtastic-ai:latest
