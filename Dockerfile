@@ -8,13 +8,14 @@ USER root
 # Set working directory (temporary storage)
 WORKDIR /tmp
 
-# Check if all required files already exist in the project directory
-RUN [ ! -d "/app" ] && mkdir -p /app
-RUN [ ! -f "/app/meshtastic_ai.py" ] && cp meshtastic_ai.py /app/
-RUN [ ! -f "/app/requirements.txt" ] && cp requirements.txt /app/
+# Copy all files to /tmp first
+COPY . /tmp/
 
 # Install dependencies
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+# Ensure /app directory exists
+RUN mkdir -p /app
 
 # Expose port 5000
 EXPOSE 5000
