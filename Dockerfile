@@ -16,14 +16,11 @@ WORKDIR /app
 # Mount a volume at /app to persist data between restarts
 VOLUME ["/app"]
 
-# Copy the current directory contents into the container at /app
-COPY . .
-
 # Install dependencies by running pip
 RUN pip install -r requirements.txt
 
-# Expose port 5000 for the application
-EXPOSE 5000
+# Copy the current directory contents into the container at /app
+COPY . .
 
 # Set the default command to start the Python interpreter
-CMD ["python", "meshtastic_ai.py"]
+CMD ["python3", "meshtastic_ai.py"]
