@@ -1,12 +1,21 @@
 FROM python:latest
 LABEL Maintainer="mr-tbot"
 
-RUN apt-get update && apt-get install -y python3-pip
-RUN pip3 install --upgrade pip
+# Install necessary packages and upgrade pip
+RUN apt-get update && apt-get install -y python3-pip && rm -rf /var/lib/apt/lists/*
+RUN pip3 install --no-cache-dir --upgrade pip
 
+# Set working directory
 WORKDIR /app
-COPY . .
-RUN pip install -r requirements.txt
 
+# Copy all files to the container
+COPY . .
+
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Expose port 5000
 EXPOSE 5000
-CMD [ "python", "meshtastic_ai.py"]
+
+# Set entry point command
+CMD ["python", "meshtastic_ai.py"]
