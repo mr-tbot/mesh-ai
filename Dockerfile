@@ -4,7 +4,7 @@ LABEL Maintainer="mr-tbot"
 # Set user to root
 USER root
 
-# Set working directory to /tmp for initial file copy
+# Set working directory (temporary storage)
 WORKDIR /tmp
 
 # Copy all files to temporary directory
@@ -19,9 +19,9 @@ RUN mkdir -p /app
 # Expose port 5000
 EXPOSE 5000
 
-# Move specific files to /app if they don't exist and then copy all other files
+# Move specific files to /app if they don't exist, then copy other files
 CMD ["sh", "-c", \
   "if [ ! -f /app/config.json ]; then mv /tmp/config.json /app/; fi && \
    if [ ! -f /app/commands_config.json ]; then mv /tmp/commands_config.json /app/; fi && \
    if [ ! -f /app/motd.json ]; then mv /tmp/motd.json /app/; fi && \
-   mv /tmp/* /app/ && cd /app && python meshtastic_ai.py"]
+   cp -r /tmp/* /app/ && python /app/meshtastic_ai.py"]
