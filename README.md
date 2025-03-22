@@ -210,6 +210,19 @@
 
 ---
 
+## Quick Start (docker-compose)
+
+1. **Copy**  
+   - Copy the docker-compose file in the root of this directory.
+2. **Run**  
+   - Run docker compose:
+     ```bash
+     sudo docker-compose up -d
+     ```
+3. **Access the WebUI Dashboard:**  
+   - Open your browser and navigate to [http://localhost:5000/dashboard](http://localhost:5000/dashboard).
+
+---
 ![Screenshot 2025-03-07 051915](https://github.com/user-attachments/assets/bc58baf4-5cfa-40e5-8086-58d24afd311c)
 
 
