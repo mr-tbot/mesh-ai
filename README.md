@@ -121,7 +121,7 @@
 ## Quick Start (docker-compose)
 
 1. **Copy**  
-   - Copy the docker-compose file in the root of this directory.
+   - Copy the docker-compose file in the root of this directory. (Note: there are two pull tags, latest will pull the "latest" working version, and "DEV", this tag will pull the latest built from the main branch of the repo.)
 2. **Run**  
    - Run docker compose:
      ```bash
