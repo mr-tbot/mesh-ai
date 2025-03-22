@@ -1,3 +1,55 @@
+# Meshtastic-AI (Alpha v0.4.2) - 
+
+- PLEASE NOTE - v0.4.2 NOW REQUIRES UNIDECODE TO RUN.  PLEASE REINSTALL YOUR REQUIREMENTS IF UPDATING!
+
+![image](https://github.com/user-attachments/assets/aa75b71a-b534-4e8c-983d-f67d73a73f5b)
+
+
+**Meshtastic-AI** (MESH-AI for short) is an experimental project that bridges [Meshtastic](https://meshtastic.org/) LoRa mesh networks with powerful AI chatbots. This release builds on the previous Alpha v0.3.0 version by introducing a major WebUI overhaul, enhanced error handling with UTC‑based logging, refined command processing (including case‑insensitivity), and expanded integrations for emergency notifications via Twilio, SMTP email, and Discord. You can choose between local models (LM Studio, Ollama), OpenAI, or even integrate with Home Assistant for off‑grid AI assistance.
+
+> **Disclaimer:**  
+> This project is **NOT ASSOCIATED** with the official Meshtastic Project. It is provided solely as an extension to add AI and advanced features to your Meshtastic network.  
+>  
+> **Alpha Software Warning:**  
+> This version is still in alpha. It may be unstable or incomplete. Please avoid relying on it for mission‑critical tasks or emergencies. Always have backup communication methods available and use responsibly.  
+>  
+> *I am one robot using other robots to write this code. Some features are still untested in the field. Check the GitHub issues for fixes or feedback!*
+
+---
+
+## Features
+
+- **Multiple AI Providers**  
+  - Support for **Local** models (LM Studio, Ollama), **OpenAI**, and even **Home Assistant** integration.
+- **Home Assistant Integration**  
+  - Seamlessly forward messages from a designated channel to Home Assistant’s conversation API. Optionally secure the integration using a PIN.
+- **Advanced Slash Commands**  
+  - Built‑in commands: `/about`, `/ping`, `/test`, `/help`, `/motd`, `/ai` (aliases: `/bot`, `/query`, `/data`), `/emergency` (or `/911`), `/whereami` plus custom commands via `commands_config.json`.
+  - Commands are now case‑insensitive for improved mobile usability.
+- **Emergency Alerts**  
+  - Trigger alerts that are sent via **Twilio SMS**, **SMTP Email**, and, if enabled, **Discord**.
+  - Emergency notifications include GPS coordinates, UTC timestamps, and user messages.
+- **Enhanced REST API & WebUI Dashboard**  
+  - A modern three‑column layout showing broadcast messages, direct messages, and available nodes.
+  - Additional endpoints include `/messages`, `/nodes`, `/connection_status`, `/logs`, `/send`, `/ui_send`, and a new `/discord_webhook` for inbound Discord messages.
+  - UI customization through settings such as theme color, hue rotation, and custom sounds.
+- **Improved Message Chunking & Routing**  
+  - Automatically splits long AI responses into configurable chunks with delays to reduce radio congestion.
+  - Configurable flags control whether the bot replies to broadcast channels and/or direct messages.
+- **Robust Error Handling & Logging**  
+  - Uses UTC‑based timestamps with an auto‑truncating script log file (keeping the last 100 lines if the file grows beyond 100 MB).
+  - Enhanced error detection (including specific OSError codes) and graceful reconnection using threaded exception hooks.
+- **Discord Integration Enhancements**  
+  - Route messages to and from Discord.
+  - New configuration options and a dedicated `/discord_webhook` endpoint allow for inbound Discord message processing.
+- **Windows‑Focused - Linux compatability confirmed!  Thanks Milo Oh!
+  - Official support for Windows environments with installation guides; instructions for Linux availble now - MacOS coming soon!
+
+---
+
+
+---
+
 ## Quick Start (Windows)
 
 1. **Download/Clone**  
@@ -402,55 +454,6 @@ Update your configuration file with the following keys (replace placeholder text
   TrpgvB8EgTtqhU1W6XJAvx3CS8KKkRwTLHc
 - **DOGE:**  
   D5MyXVRkwLW9XzcKjjcwEHcXvnaTFueZhy
-
----
-
-# Meshtastic-AI (Alpha v0.4.2) - 
-
-- PLEASE NOTE - v0.4.2 NOW REQUIRES UNIDECODE TO RUN.  PLEASE REINSTALL YOUR REQUIREMENTS IF UPDATING!
-
-![image](https://github.com/user-attachments/assets/aa75b71a-b534-4e8c-983d-f67d73a73f5b)
-
-
-**Meshtastic-AI** (MESH-AI for short) is an experimental project that bridges [Meshtastic](https://meshtastic.org/) LoRa mesh networks with powerful AI chatbots. This release builds on the previous Alpha v0.3.0 version by introducing a major WebUI overhaul, enhanced error handling with UTC‑based logging, refined command processing (including case‑insensitivity), and expanded integrations for emergency notifications via Twilio, SMTP email, and Discord. You can choose between local models (LM Studio, Ollama), OpenAI, or even integrate with Home Assistant for off‑grid AI assistance.
-
-> **Disclaimer:**  
-> This project is **NOT ASSOCIATED** with the official Meshtastic Project. It is provided solely as an extension to add AI and advanced features to your Meshtastic network.  
->  
-> **Alpha Software Warning:**  
-> This version is still in alpha. It may be unstable or incomplete. Please avoid relying on it for mission‑critical tasks or emergencies. Always have backup communication methods available and use responsibly.  
->  
-> *I am one robot using other robots to write this code. Some features are still untested in the field. Check the GitHub issues for fixes or feedback!*
-
----
-
-## Features
-
-- **Multiple AI Providers**  
-  - Support for **Local** models (LM Studio, Ollama), **OpenAI**, and even **Home Assistant** integration.
-- **Home Assistant Integration**  
-  - Seamlessly forward messages from a designated channel to Home Assistant’s conversation API. Optionally secure the integration using a PIN.
-- **Advanced Slash Commands**  
-  - Built‑in commands: `/about`, `/ping`, `/test`, `/help`, `/motd`, `/ai` (aliases: `/bot`, `/query`, `/data`), `/emergency` (or `/911`), `/whereami` plus custom commands via `commands_config.json`.
-  - Commands are now case‑insensitive for improved mobile usability.
-- **Emergency Alerts**  
-  - Trigger alerts that are sent via **Twilio SMS**, **SMTP Email**, and, if enabled, **Discord**.
-  - Emergency notifications include GPS coordinates, UTC timestamps, and user messages.
-- **Enhanced REST API & WebUI Dashboard**  
-  - A modern three‑column layout showing broadcast messages, direct messages, and available nodes.
-  - Additional endpoints include `/messages`, `/nodes`, `/connection_status`, `/logs`, `/send`, `/ui_send`, and a new `/discord_webhook` for inbound Discord messages.
-  - UI customization through settings such as theme color, hue rotation, and custom sounds.
-- **Improved Message Chunking & Routing**  
-  - Automatically splits long AI responses into configurable chunks with delays to reduce radio congestion.
-  - Configurable flags control whether the bot replies to broadcast channels and/or direct messages.
-- **Robust Error Handling & Logging**  
-  - Uses UTC‑based timestamps with an auto‑truncating script log file (keeping the last 100 lines if the file grows beyond 100 MB).
-  - Enhanced error detection (including specific OSError codes) and graceful reconnection using threaded exception hooks.
-- **Discord Integration Enhancements**  
-  - Route messages to and from Discord.
-  - New configuration options and a dedicated `/discord_webhook` endpoint allow for inbound Discord message processing.
-- **Windows‑Focused - Linux compatability confirmed!  Thanks Milo Oh!
-  - Official support for Windows environments with installation guides; instructions for Linux availble now - MacOS coming soon!
 
 ---
 
