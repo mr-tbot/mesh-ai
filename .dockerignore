@@ -1,3 +1,9 @@
 config.json
 commands_config.json
 motd.json
+.git
+*.pyc
+*.pyo
+__pycache__
+Dockerfile
+.dockerignore
