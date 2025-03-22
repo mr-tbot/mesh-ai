@@ -4,9 +4,13 @@ on:
   push:
     branches:
       - main
+    tags:
+      - 'v*'  # This triggers the workflow on tag push (e.g., v1.0.0)
   pull_request:
     branches:
       - main
+  release:
+    types: [published]  # This triggers when a release is published
 
 jobs:
   build-and-push:
@@ -24,8 +28,22 @@ jobs:
 
       - name: Build Docker Image
         run: |
-          docker build -t ghcr.io/nerdscorp/meshtastic-ai:latest .
+          if [[ "${GITHUB_REF}" == "refs/tags/"* ]]; then
+            # If it's a tag push (e.g., release), use "latest" as the image tag
+            IMAGE_TAG="latest"
+          elif [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            # If it's a push to main branch, use "DEV" as the image tag
+            IMAGE_TAG="DEV"
+          fi
+          docker build -t ghcr.io/nerdscorp/meshtastic-ai:$IMAGE_TAG .
 
       - name: Push Docker Image
         run: |
-          docker push ghcr.io/nerdscorp/meshtastic-ai:latest
+          if [[ "${GITHUB_REF}" == "refs/tags/"* ]]; then
+            # For tags (releases), push with "latest" tag
+            IMAGE_TAG="latest"
+          elif [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            # For main branch, push with "DEV" tag
+            IMAGE_TAG="DEV"
+          fi
+          docker push ghcr.io/nerdscorp/meshtastic-ai:$IMAGE_TAG
