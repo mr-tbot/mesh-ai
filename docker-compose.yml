@@ -1,11 +1,16 @@
-version: '3.7'
 services:
   meshtastic-ai:
-    image: meshtastic-ai:latest
+    image: mrtbot/meshtastic-ai:latest
+    container_name: meshtastic-ai
     ports:
-      - 5000:5000
+      - "5000:5000"
+#    devices:
+#      - "/dev/ttyUSB0:/dev/ttyUSB0"  #uncomment if using USB & assign device ID to forward to the container.
     volumes:
-      # Copy config files to directory on docker host and update directory location below
-      - /opt/docker/meshtastic-ai/config.json:/app/config.json
-      - /opt/docker/meshtastic-ai/commands_config.json:/app/commands_config.json
-      - /opt/docker/meshtastic-ai/motd.json:/app/motd.json
+      - ./config/config.json:/app/config.json
+      - ./config/commands_config.json:/app/commands_config.json
+      - ./config/motd.json:/app/motd.json
+      - ./logs/script.log:/app/script.log
+      - ./logs/messages.log:/app/messages.log
+      - ./logs/messages_archive.json:/app/messages_archive.json
+    restart: unless-stopped
