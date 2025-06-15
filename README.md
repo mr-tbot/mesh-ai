@@ -1,6 +1,6 @@
-# Meshtastic-AI (Alpha v0.4.2) - 
+# Meshtastic-AI (Alpha v0.4.2) - NOW WITH DOCKER SUPPORT FULLY WORKING!
 
-- PLEASE NOTE - v0.4.2 NOW REQUIRES UNIDECODE TO RUN.  PLEASE REINSTALL YOUR REQUIREMENTS IF UPDATING!
+- PLEASE NOTE - Protobuf changes are throwing errors in v4.2 - this is due to the Meshtastic-CLI falling behind in development a bit compared to current firmware versions.  It does not affect the core functions of the script at this time.
 
 ![image](https://github.com/user-attachments/assets/aa75b71a-b534-4e8c-983d-f67d73a73f5b)
 
@@ -206,6 +206,48 @@
      ```
 
 6. **Access the WebUI Dashboard:**  
+   - Open your browser and navigate to [http://localhost:5000/dashboard](http://localhost:5000/dashboard).
+
+
+## Quick Start (Docker)
+
+1. **Prerequisites**  
+   - Docker installed on your host (Linux, macOS, Windows or Raspberry Pi).  (Current Images Built for Linux x86 & ARM64 Raspberry Pi)
+   - Docker support is currently untested on Windows & MacOS, and the Raspberry Pi image remains fresh and untested - please report back!
+   - A Meshtastic device connected via USB or WiFi (No Bluetooth testing Done as of yet)
+   - If needed,uncomment USB sections and set identifiers such as `/dev/ttyUSB0` or `\\.\COM3`.
+
+2. **Prepare the Volume Structure**  
+   - In the root of your project directory:
+   - Extract the "docker-required-volumes.zip" - The included "config" & "logs" folders should be within your "meshtastic-ai folder"
+   - This file structure differs from the standard release to accommodate volumes for docker
+   - These files are placed in order to prevent docker from replacing these with directories on first start and throwing errors.
+   - Make any changes to config files as needed before moving forward.
+
+File strcture should look like this:
+
+   ```bash
+   meshtastic-ai/
+   ├── config/
+   │   ├── config.json
+   │   ├── commands_config.json
+   │   └── motd.json
+   └── logs/
+    ├── script.log
+    ├── messages.log
+    └── messages_archive.json
+```
+
+
+3. **Pull & run the Docker Image using docker-compose**
+   - An example docker-compose-yaml is included in the github repository - please adjust as needed.
+   - From the project directory, run:
+   ```bash
+   docker pull mrtbot/meshtastic-ai:latest
+   docker-compose up -d
+  
+
+4. **Access the WebUI Dashboard:**  
    - Open your browser and navigate to [http://localhost:5000/dashboard](http://localhost:5000/dashboard).
 
 ---
