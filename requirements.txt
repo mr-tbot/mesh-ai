@@ -1,4 +1,4 @@
-meshtastic==2.6.3
+meshtastic==2.6.4
 pubsub==0.1.2
 requests==2.32.3
 Flask==3.1.0
