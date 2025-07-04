@@ -1,17 +1,19 @@
-# Meshtastic-AI (Alpha v0.4.2) - NOW WITH DOCKER SUPPORT FULLY WORKING!
+# Meshtastic-AI (BETA v0.5.0) - NOW IN BETA!
 
-- PLEASE NOTE - Protobuf changes are throwing errors in v4.2 - this is due to the Meshtastic-CLI falling behind in development a bit compared to current firmware versions.  It does not affect the core functions of the script at this time.
+- PLEASE NOTE - MESH-AI is out of ALPHA!  There are new requirements and new config options!  Old configs should work out of the box - but please see below for changes.
 
-![image](https://github.com/user-attachments/assets/aa75b71a-b534-4e8c-983d-f67d73a73f5b)
+![image](https://github.com/user-attachments/assets/622a3f1f-2054-456d-8357-d66ee586e39c)
+
 
 
 **Meshtastic-AI** (MESH-AI for short) is an experimental project that bridges [Meshtastic](https://meshtastic.org/) LoRa mesh networks with powerful AI chatbots. This release builds on the previous Alpha v0.3.0 version by introducing a major WebUI overhaul, enhanced error handling with UTC‑based logging, refined command processing (including case‑insensitivity), and expanded integrations for emergency notifications via Twilio, SMTP email, and Discord. You can choose between local models (LM Studio, Ollama), OpenAI, or even integrate with Home Assistant for off‑grid AI assistance.
 
 > **Disclaimer:**  
 > This project is **NOT ASSOCIATED** with the official Meshtastic Project. It is provided solely as an extension to add AI and advanced features to your Meshtastic network.  
->  
-> **Alpha Software Warning:**  
-> This version is still in alpha. It may be unstable or incomplete. Please avoid relying on it for mission‑critical tasks or emergencies. Always have backup communication methods available and use responsibly.  
+
+> **BETA Software Warning:**  
+> This version is still in BETA. It may be unstable or incomplete. Please avoid relying on it for mission‑critical tasks or emergencies. Always have backup communication methods available and use responsibly.  
+
 >  
 > *I am one robot using other robots to write this code. Some features are still untested in the field. Check the GitHub issues for fixes or feedback!*
 
@@ -48,6 +50,76 @@
 ---
 
 ## Changelog
+
+### New Updates in v0.4.2 → v0.5.0 - NOW IN BETA!
+- **WebUI Enhancements**  
+  - **Node Search** added for easier node management.  
+  - **Channel Message Organization** with support for custom channels in `config.json`.  
+  - **Revamped DM threaded messaging** system.
+  - **Location Links** for nodes with available location data via Google Maps.
+  - **Timezone Selection** for accurate incoming message timestamps.
+  - **Custom Local Sounds** for message notifications (no longer relying on hosted files).
+  - **Logs Page Auto-Refresh** for live updates.
+- **Baudrate Adjustment**  
+  - Configurable **baud rate** in `config.json` for longer USB connections (e.g., roof nodes).
+- **LM Studio Model Selection**  
+  - Support for selecting models when multiple are loaded in LM Studio, enabling multi-model instances.
+- **Protobuf Noise Debugging**  
+  - Moved any protobuf-related errors behind debug logs as they do not affect functionality.  
+  - Can be enabled by setting `"debug": true` in `config.json` to track.
+- **Updated Docker Support**  
+  - Updated Docker configuration to always pull/build the latest Meshtastic-Python libraries, ensuring compatibility with Protobuf versions.
+### POSSIBLE BUGS IN BETA v0.5.0 - Web UI ticker isn't honoring read messages in some cases.
+
+### New Updates in v0.4.1 → v0.4.2
+- **Initial Ubuntu & Ollama Unidecode Support: -**  
+  - User @milo_o - Thank you so much!  I have merged your idea into the main branch - hoping this works as expected for users - please report any problems!  -  https://github.com/mr-tbot/meshtastic-ai/discussions/19
+- **Emergency Email Google Maps Link:**  
+  - Emergency email now includes a Google Maps link to the sender's location, rather than just coordinates. - Great call, @Nlantz79!  (Remember - this is only as accurate as the sender node's location precision allows!)
+
+### New Updates in v0.4.0 → v0.4.1
+- **Error Handling (ongoing):**  
+  - Trying a new method to handle WinError exceptions - which though much improved in v0.4.0 - still occur under the right connection circumstances - especially over Wi-Fi.  
+     (**UPDATE: My WinError issues were being caused by a combination of low solar power, and MQTT being enabled on my node.  MQTT - especially using LongFast is very intense on a node, and can cause abrupt connection restarts as noted here:  https://github.com/meshtastic/meshtastic/pull/901 - but - now the script is super robust regardless for handling errors!)**
+- **Emergency Email Subject:**  
+  - Email Subject now includes the long name, short name & Node ID of the sending node, rather than just the Node ID.
+- **INITIAL Docker Support**  
+
+### New Updates in v0.3.0 → v0.4.0
+- **Logging & Timestamps:**  
+  - Shift to UTC‑based timestamps and enhanced log management.
+- **Discord Integration:**  
+  - Added configuration for inbound/outbound Discord message routing.
+  - Introduced a new `/discord_webhook` endpoint for processing messages from Discord.
+- **Emergency Notifications:**  
+  - Expanded emergency alert logic to include detailed context (GPS data, UTC time) and Discord notifications.
+- **Sending and receiving SMS:**  
+  - Send SMS using `/sms <+15555555555> <message>`
+  - Config options to either route incoming Twilio SMS messages to a specific node, or a channel index.
+- **Command Handling:**  
+  - Made all slash commands case‑insensitive to improve usability.
+  - Enhanced custom command support via `commands_config.json` with dynamic AI prompt insertion.
+- **Improved Error Handling & Reconnection:**  
+  - More granular detection of connection errors (e.g., specific OSError codes) and use of a global reset event for reconnects.
+- **Code Refactoring:**  
+  - Overall code improvements for maintainability and clarity, with additional debug prints for troubleshooting.
+
+### Changelog: v0.2.2 → v0.3.0 (from the original Main Branch README)
+- **WebUI Overhaul:**  
+  - Redesigned three‑column dashboard showing channel messages, direct messages, and node list.
+  - New send‑message form with toggleable modes (broadcast vs. direct), dynamic character counting, and message chunk preview.
+- **Improved Error Handling & Stability:**  
+  - Redirected stdout/stderr to a persistent `script.log` file with auto‑truncation.
+  - Added a connection monitor thread to detect disconnections and trigger automatic reconnects.
+  - Implemented a thread exception hook for better error logging.
+- **Enhanced Message Routing & AI Response Options:**  
+  - Added configuration flags (`reply_in_channels` and `reply_in_directs`) to control AI responses.
+  - Increased maximum message chunks (default up to 5) for longer responses.
+  - Updated slash command processing (e.g., added `/about`) and support for custom commands.
+- **Expanded API Endpoints:**  
+  - New endpoints: `/nodes`, updated `/connection_status`, and `/ui_send`.
+- **Additional Improvements:**  
+  - Robust Home Assistant integration and basic emergency alert enhancements.
 
 ## 1. Changelog: v0.1 → v0.2.2
 
@@ -90,56 +162,6 @@
    - Thorough refactoring of the code to be more modular and maintainable.  
    - Better debugging hooks, improved concurrency handling, and safer resource cleanup.  
 
-### Changelog: v0.2.2 → v0.3.0 (from the original Main Branch README)
-- **WebUI Overhaul:**  
-  - Redesigned three‑column dashboard showing channel messages, direct messages, and node list.
-  - New send‑message form with toggleable modes (broadcast vs. direct), dynamic character counting, and message chunk preview.
-- **Improved Error Handling & Stability:**  
-  - Redirected stdout/stderr to a persistent `script.log` file with auto‑truncation.
-  - Added a connection monitor thread to detect disconnections and trigger automatic reconnects.
-  - Implemented a thread exception hook for better error logging.
-- **Enhanced Message Routing & AI Response Options:**  
-  - Added configuration flags (`reply_in_channels` and `reply_in_directs`) to control AI responses.
-  - Increased maximum message chunks (default up to 5) for longer responses.
-  - Updated slash command processing (e.g., added `/about`) and support for custom commands.
-- **Expanded API Endpoints:**  
-  - New endpoints: `/nodes`, updated `/connection_status`, and `/ui_send`.
-- **Additional Improvements:**  
-  - Robust Home Assistant integration and basic emergency alert enhancements.
-
-### New Updates in v0.3.0 → v0.4.0
-- **Logging & Timestamps:**  
-  - Shift to UTC‑based timestamps and enhanced log management.
-- **Discord Integration:**  
-  - Added configuration for inbound/outbound Discord message routing.
-  - Introduced a new `/discord_webhook` endpoint for processing messages from Discord.
-- **Emergency Notifications:**  
-  - Expanded emergency alert logic to include detailed context (GPS data, UTC time) and Discord notifications.
-- **Sending and receiving SMS:**  
-  - Send SMS using `/sms <+15555555555> <message>`
-  - Config options to either route incoming Twilio SMS messages to a specific node, or a channel index.
-- **Command Handling:**  
-  - Made all slash commands case‑insensitive to improve usability.
-  - Enhanced custom command support via `commands_config.json` with dynamic AI prompt insertion.
-- **Improved Error Handling & Reconnection:**  
-  - More granular detection of connection errors (e.g., specific OSError codes) and use of a global reset event for reconnects.
-- **Code Refactoring:**  
-  - Overall code improvements for maintainability and clarity, with additional debug prints for troubleshooting.
-
-### New Updates in v0.4.0 → v0.4.1
-- **Error Handling (ongoing):**  
-  - Trying a new method to handle WinError exceptions - which though much improved in v0.4.0 - still occur under the right connection circumstances - especially over Wi-Fi.  
-     (**UPDATE: My WinError issues were being caused by a combination of low solar power, and MQTT being enabled on my node.  MQTT - especially using LongFast is very intense on a node, and can cause abrupt connection restarts as noted here:  https://github.com/meshtastic/meshtastic/pull/901 - but - now the script is super robust regardless for handling errors!)**
-- **Emergency Email Subject:**  
-  - Email Subject now includes the long name, short name & Node ID of the sending node, rather than just the Node ID.
-- **Docker Support**  
-  - Thanks @clendaniel - Who was kind enough to generate a Dockerfile & docker-compose.yaml for the project!
-
-### New Updates in v0.4.1 → v0.4.2
-- **Initial Ubuntu & Ollama Unidecode Support: -**  
-  - User @milo_o - Thank you so much!  I have merged your idea into the main branch - hoping this works as expected for users - please report any problems!  -  https://github.com/mr-tbot/meshtastic-ai/discussions/19
-- **Emergency Email Google Maps Link:**  
-  - Emergency email now includes a Google Maps link to the sender's location, rather than just coordinates. - Great call, @Nlantz79!  (Remember - this is only as accurate as the sender node's location precision allows!)
 ---
 
 ## Quick Start (Windows)
@@ -252,7 +274,8 @@ File strcture should look like this:
 
 ---
 
-![Screenshot 2025-03-07 051915](https://github.com/user-attachments/assets/bc58baf4-5cfa-40e5-8086-58d24afd311c)
+![image](https://github.com/user-attachments/assets/0bc7e4a0-7eee-4b8b-b79a-38fce61e9ea8)
+
 
 
 ---
@@ -308,23 +331,26 @@ Your `config.json` file controls almost every aspect of Meshtastic-AI. Below is 
   "debug": false,
   
   "serial_port": "",
+# "serial_baud": 460800, // SET ONLY IF NEEDED - LONGER CABLE RUNS OR BAD USB CONNECTIONS
   "use_mesh_interface": false,
   "use_wifi": true,
   "wifi_host": "<MESHTASTIC NODE IP HERE>",
   "wifi_port": 4403,
 
   "ai_provider": "lmstudio", 
-  "system_prompt": "You are a helpful assistant responding to mesh network chats. Respond in as few words as possible while still answering fully.",
-  
+  "system_prompt": "You are a helpful assistant responding to mesh network chats. Respond in as few words as possible - under 1000 characters - while still answering fully.",
+
+# "lmstudio_chat_model": "llama-3.2-1b-instruct-uncensored", //ENABLE AND SET IF USING MORE THAN ONE MODEL IN LM-STUDIO
+# "lmstudio_embedding_model": "text-embedding-nomic-embed-text-v1.5", //ENABLE AND SET IF USING TEXT EMBEDDING IN LM-STUDIO
   "lmstudio_url": "http://localhost:1234/v1/chat/completions",
   "lmstudio_timeout": 60,
   
   "openai_api_key": "",
-  "openai_model": "gpt-3.5-turbo",
+  "openai_model": "gpt-4.1-mini",
   "openai_timeout": 30,
   
   "ollama_url": "http://localhost:11434/api/generate",
-  "ollama_model": "llama2",
+  "ollama_model": "llama3",
   "ollama_timeout": 60,
   
   "home_assistant_url": "http://homeassistant.local:8123/api/conversation/process",
@@ -335,6 +361,8 @@ Your `config.json` file controls almost every aspect of Meshtastic-AI. Below is 
   "home_assistant_enabled": false,
   "home_assistant_channel_index": -1,
   
+
+#  //MANUALLY NAME CHANNELS FOR WEB UI 
   "channel_names": {
     "0": "Channel 0",
     "1": "Channel 1",
@@ -407,7 +435,7 @@ Your `config.json` file controls almost every aspect of Meshtastic-AI. Below is 
 
 ### LLM API Integration
 - **LM Studio:**  
-  - Set `"ai_provider": "lmstudio"` and configure `"lmstudio_url"`.
+  - Set `"ai_provider": "lmstudio"` and configure `"lmstudio_url"`. - optionally set model and text embedding flags as well if using more than one model on the same LM-Studio instance.
 - **OpenAI:**  
   - Set `"ai_provider": "openai"`, provide your API key in `"openai_api_key"`, and choose a model.
 - **Ollama:**  
@@ -538,6 +566,7 @@ Update your configuration file with the following keys (replace placeholder text
 - **Device Connection:**  
   - Configure the connection method for your Meshtastic device by setting either the `"serial_port"` or enabling `"use_wifi"` along with `"wifi_host"` and `"wifi_port"`.  
   - Alternatively, enable `"use_mesh_interface"` if applicable.
+  - Baud Rate is optionally set if you need - this is for longer USB runs (roof nodes connected via USB) and bad USB connections.
   
 - **Message Routing & Commands:**  
   - Custom commands can be added in `commands_config.json`.
@@ -580,7 +609,7 @@ Update your configuration file with the following keys (replace placeholder text
 
 ## Conclusion
 
-Meshtastic-AI Alpha v0.4.2 takes the solid foundation of v0.4.0 and introduces significant improvements in logging, error handling, Discord integration, and emergency alert routing. Whether you’re chatting directly with your node, integrating with Home Assistant, or leveraging multi‑channel alerting (Twilio, Email, Discord), this release offers a more comprehensive and reliable off‑grid AI assistant experience.
+Meshtastic-AI BETA v0.5.0 takes the solid foundation of v0.4.2 and introduces even more significant improvements in logging, error handling, and a bit of polish on the web-UI and it's function.  Whether you’re chatting directly with your node, integrating with Home Assistant, or leveraging multi‑channel alerting (Twilio, Email, Discord), this release offers a more comprehensive and reliable off‑grid AI assistant experience.
 
 **Enjoy tinkering, stay safe, and have fun!**  
 Please share your feedback or join our community on GitHub.
