@@ -6,7 +6,7 @@
 
 
 
-**Meshtastic-AI** (MESH-AI for short) is an experimental project that bridges [Meshtastic](https://meshtastic.org/) LoRa mesh networks with powerful AI chatbots. This release builds on the previous Alpha v0.3.0 version by introducing a major WebUI overhaul, enhanced error handling with UTC‑based logging, refined command processing (including case‑insensitivity), and expanded integrations for emergency notifications via Twilio, SMTP email, and Discord. You can choose between local models (LM Studio, Ollama), OpenAI, or even integrate with Home Assistant for off‑grid AI assistance.
+**Meshtastic-AI** (MESH-AI for short) is an experimental project that bridges [Meshtastic](https://meshtastic.org/) LoRa mesh networks with powerful AI chatbots. This is the FIRST BETA RELEASE!
 
 > **Disclaimer:**  
 > This project is **NOT ASSOCIATED** with the official Meshtastic Project. It is provided solely as an extension to add AI and advanced features to your Meshtastic network.  
