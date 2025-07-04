@@ -45,7 +45,7 @@
   - Route messages to and from Discord.
   - New configuration options and a dedicated `/discord_webhook` endpoint allow for inbound Discord message processing.
 - **Windows & Linux Focused**
-  - Official support for Windows environments with installation guides; instructions for Linux availble now - MacOS coming soon!
+  - Official support for Windows environments with installation guides; instructions for Linux available now - MacOS coming soon!
 
 ---
 
