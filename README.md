@@ -328,93 +328,84 @@ Your `config.json` file controls almost every aspect of Meshtastic-AI. Below is 
 
 ```json
 {
-  "debug": false,
+  "debug": false, 
+  "use_mesh_interface": false,  // Set to true if using the Meshtastic mesh interface instead of WiFi
+  "use_wifi": true,  // Set to false if using a serial connection instead of WiFi
+  "wifi_host": "MESHTASTIC NODE IP HERE",  // IP address of your Meshtastic device if using WiFi
+  "wifi_port": 4403,  // Default port for WiFi connection
   
-  "serial_port": "",
-# "serial_baud": 460800, // SET ONLY IF NEEDED - LONGER CABLE RUNS OR BAD USB CONNECTIONS
-  "use_mesh_interface": false,
-  "use_wifi": true,
-  "wifi_host": "<MESHTASTIC NODE IP HERE>",
-  "wifi_port": 4403,
+  "serial_port": "",  // Set the serial port if using a USB connection (e.g., /dev/ttyUSB0 on Linux or COMx on Windows)
+  // "serial_baud": 460800,  // Set baud rate for long USB runs or subpar USB connections (uncomment to use)
 
-  "ai_provider": "lmstudio", 
-  "system_prompt": "You are a helpful assistant responding to mesh network chats. Respond in as few words as possible - under 1000 characters - while still answering fully.",
+  "ai_provider": "lmstudio, openai, or ollama",  // Select the AI provider: "lmstudio", "openai", or "ollama"
+  "system_prompt": "You are a helpful assistant responding to mesh network chats. Respond in as few words as possible while still answering fully.",  // System prompt for AI interaction
 
-# "lmstudio_chat_model": "llama-3.2-1b-instruct-uncensored", //ENABLE AND SET IF USING MORE THAN ONE MODEL IN LM-STUDIO
-# "lmstudio_embedding_model": "text-embedding-nomic-embed-text-v1.5", //ENABLE AND SET IF USING TEXT EMBEDDING IN LM-STUDIO
-  "lmstudio_url": "http://localhost:1234/v1/chat/completions",
-  "lmstudio_timeout": 60,
-  
-  "openai_api_key": "",
-  "openai_model": "gpt-4.1-mini",
-  "openai_timeout": 30,
-  
-  "ollama_url": "http://localhost:11434/api/generate",
-  "ollama_model": "llama3",
-  "ollama_timeout": 60,
-  
-  "home_assistant_url": "http://homeassistant.local:8123/api/conversation/process",
-  "home_assistant_token": "your_home_assistant_token",
-  "home_assistant_timeout": 30,
-  "home_assistant_enable_pin": false,
-  "home_assistant_secure_pin": "1234",
-  "home_assistant_enabled": false,
-  "home_assistant_channel_index": -1,
-  
+  "lmstudio_url": "http://localhost:1234/v1/chat/completions",  // URL for LM Studio's API
+  // "lmstudio_chat_model": "MODEL IDENTIFIER HERE",  // LM Studio chat model (uncomment and specify if using LM Studio)
+  // "lmstudio_embedding_model": "TEXT EMBEDDING MODEL IDENTIFIER HERE",  // LM Studio embedding model (uncomment and specify if using LM Studio)
+  "lmstudio_timeout": 60,  // Timeout in seconds for LM Studio API requests
 
-#  //MANUALLY NAME CHANNELS FOR WEB UI 
+  "openai_api_key": "",  // API key for OpenAI (leave empty if not using OpenAI)
+  "openai_model": "gpt-4.1-mini",  // OpenAI model to use (e.g., "gpt-4.1-mini" or "gpt-3.5-turbo")
+  "openai_timeout": 60,  // Timeout in seconds for OpenAI API requests
+
+  "ollama_url": "http://localhost:11434/api/generate",  // URL for Ollama's API
+  "ollama_model": "llama3",  // Ollama model (e.g., "llama3")
+  "ollama_timeout": 60,  // Timeout in seconds for Ollama API requests
+
+  "home_assistant_url": "http://homeassistant.local:8123/api/conversation/process",  // Home Assistant API URL for conversation processing
+  "home_assistant_token": "INPUT HA TOKEN HERE",  // Home Assistant API token (replace with your token)
+  "home_assistant_timeout": 90,  // Timeout in seconds for Home Assistant API requests
+  "home_assistant_enable_pin": false,  // Set to true to require a PIN for Home Assistant commands
+  "home_assistant_secure_pin": "1234",  // PIN for Home Assistant (if enabled)
+
+  "home_assistant_enabled": false,  // Set to true to enable Home Assistant integration
+  "home_assistant_channel_index": 1,  // Index of the channel for Home Assistant messages (set to -1 if not using)
+
   "channel_names": {
-    "0": "Channel 0",
-    "1": "Channel 1",
-    "2": "Channel 2",
-    "3": "Channel 3",
-    "4": "Channel 4",
-    "5": "Channel 5",
-    "6": "Channel 6",
-    "7": "Channel 7",
-    "8": "Channel 8",
-    "9": "Channel 9"
+    "0": "LongFast",  // Name for Channel 0
+    "1": "Channel 1",  // Name for Channel 1
+    "2": "Channel 2",  // Name for Channel 2
+    "3": "Channel 3",  // Name for Channel 3
+    "4": "Channel 4",  // Name for Channel 4
+    "5": "Channel 5",  // Name for Channel 5
+    "6": "Channel 6",  // Name for Channel 6
+    "7": "Channel 7",  // Name for Channel 7
+    "8": "Channel 8",  // Name for Channel 8
+    "9": "Channel 9"   // Name for Channel 9
   },
   
-  "reply_in_channels": true,
-  "reply_in_directs": true,
-  "chunk_size": 200,
-  "max_ai_chunks": 5,
-  "chunk_delay": 10,
+  "reply_in_channels": true,  // Set to true to allow AI to reply in broadcast channels
+  "reply_in_directs": true,  // Set to true to allow AI to reply in direct messages
   
-  "local_location_string": "@ MY LOCATION",
-  "ai_node_name": "Mesh-AI-Alpha",
-  "max_message_log": 100,
+  "chunk_size": 200,  // Maximum size for message chunks
+  "max_ai_chunks": 5,  // Maximum number of chunks to split AI responses into
+  "chunk_delay": 10,  // Delay between message chunks to reduce congestion
   
-  "enable_twilio": false,
-  "enable_smtp": false,
-  
-  "alert_phone_number": "+15555555555",
-  "twilio_sid": "ACXXXXXXXXXXXXXXX",
-  "twilio_auth_token": "your_twilio_auth_token",
-  "twilio_from_number": "+14444444444",
-  
-  "smtp_host": "smtp.example.com",
-  "smtp_port": 465,
-  "smtp_user": "user@example.com",
-  "smtp_pass": "your_smtp_password",
-  "alert_email_to": [
-    "first@example.com",
-    "second@example.com",
-    "third@example.com"
-  ],
-  
-  "enable_discord": false,
-  "discord_webhook_url": "https://discord.com/api/webhooks/XXXXXXXXXXXX/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
-  "discord_send_emergency": false,
-  "discord_send_ai": false,
-  "discord_send_all": false,
-  "discord_response_channel_index": 0,
-  "discord_receive_enabled": false,
-  "discord_inbound_channel_index": 0,
-  "discord_bot_token": "",
-  "discord_channel_id": ""
+  "local_location_string": "@ YOUR LOCATION HERE",  // Local string for your node's location (e.g., "@ Home", "@ Roof Node")
+  "ai_node_name": "Mesh-AI-Alpha",  // Name for your AI node
+  "max_message_log": 0,  // Set the maximum number of messages to log (set to 0 for unlimited)
+
+  "enable_twilio": false,  // Set to true to enable Twilio for emergency alerts via SMS
+  "enable_smtp": false,  // Set to true to enable SMTP for emergency alerts via email
+  "alert_phone_number": "+15555555555",  // Phone number to send emergency SMS alerts to (Twilio)
+  "twilio_sid": "TWILIO_SID",  // Twilio SID (replace with your SID)
+  "twilio_auth_token": "TWILIO_AUTH_TOKEN",  // Twilio Auth Token (replace with your Auth Token)
+  "twilio_from_number": "+14444444444",  // Twilio phone number to send messages from
+
+  "smtp_host": "SMTP HOST HERE",  // SMTP server hostname (e.g., smtp.gmail.com)
+  "smtp_port": 465,  // SMTP server port (465 for SSL, or 587 for TLS)
+  "smtp_user": "SMTP USER HERE",  // SMTP username (usually your email address)
+  "smtp_pass": "SMTP PASS HERE",  // SMTP password (use app-specific passwords if necessary)
+  "alert_email_to": "ALERT EMAIL HERE",  // Email address to send emergency alerts to
+
+  "enable_discord": false,  // Set to true to enable Discord integration for emergency alerts and AI responses
+  "discord_webhook_url": "",  // Discord Webhook URL (for sending messages to Discord)
+  "discord_send_emergency": false,  // Set to true to send emergency alerts to Discord
+  "discord_send_ai": false,  // Set to true to send AI responses to Discord
+  "discord_send_all": false  // Set to true to send all messages to Discord
 }
+
 ```
 
 ---
