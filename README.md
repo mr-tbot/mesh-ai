@@ -70,6 +70,7 @@
 - **Updated Docker Support**  
   - Updated Docker configuration to always pull/build the latest Meshtastic-Python libraries, ensuring compatibility with Protobuf versions.
 ### POSSIBLE BUGS IN BETA v0.5.0 - Web UI ticker isn't honoring read messages in some cases.
+### INCOMING MESSAGE SOUNDS ARE UNTESTED ON ALL PLATFORMS AND FILESYSTEMS.
 
 ### New Updates in v0.4.1 → v0.4.2
 - **Initial Ubuntu & Ollama Unidecode Support: -**  
