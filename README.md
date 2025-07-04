@@ -168,7 +168,7 @@
 ## Quick Start (Windows)
 
 1. **Download/Clone**  
-   - Clone the repository or copy the **meshtastic-ai** folder to your Desktop.
+   - Clone the repository or copy the **meshtastic-ai** folder to your Desktop.  (Rename and remove "-main" tag from the folder name if downloading as ZIP)
 2. **Install Dependencies:**  
    - Create a virtual environment:
      ```bash
