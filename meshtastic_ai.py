@@ -12,12 +12,54 @@ import smtplib
 from email.mime.text import MIMEText
 import logging
 import traceback
-from flask import Flask, request, jsonify, redirect, url_for
+from flask import Flask, request, jsonify, redirect, url_for, stream_with_context, Response
 import sys
 import socket  # for socket error checking
+import re
 from twilio.rest import Client  # for Twilio SMS support
 from unidecode import unidecode   # Added unidecode import for Ollama text normalization
+from google.protobuf.message import DecodeError
+# Make sure DEBUG_ENABLED exists before any logger/filter classes use it
+# -----------------------------
+# Global Debug & Noise Patterns
+# -----------------------------
+# Debug flag loaded later from config.json
+DEBUG_ENABLED = False
+# Suppress these protobuf messages unless DEBUG_ENABLED=True
+NOISE_PATTERNS = (
+    "Error while parsing FromRadio",
+    "Error parsing message with type 'meshtastic.protobuf.FromRadio'",
+    "Traceback",
+    "meshtastic/stream_interface.py",
+    "meshtastic/mesh_interface.py",
+)
 
+class _ProtoNoiseFilter(logging.Filter):
+    NOISY = (
+        "Error while parsing FromRadio",
+        "Error parsing message with type 'meshtastic.protobuf.FromRadio'",
+    )
+
+    def filter(self, rec: logging.LogRecord) -> bool:
+        noisy = any(s in rec.getMessage() for s in self.NOISY)
+        return DEBUG_ENABLED or not noisy        # show only in debug mode
+
+root_log       = logging.getLogger()          # the root logger
+meshtastic_log = logging.getLogger("meshtastic")
+
+for lg in (root_log, meshtastic_log):
+    lg.addFilter(_ProtoNoiseFilter())
+
+def dprint(*args, **kwargs):
+    if DEBUG_ENABLED:
+        print(*args, **kwargs)
+
+def info_print(*args, **kwargs):
+    if not DEBUG_ENABLED:
+        print(*args, **kwargs)
+
+if DEBUG_ENABLED:
+    print(f"DEBUG: Loaded main config => {config}")
 # -----------------------------
 # Verbose Logging Setup
 # -----------------------------
@@ -27,6 +69,17 @@ server_start_time = datetime.now(timezone.utc)  # Now using UTC time
 restart_count = 0
 
 def add_script_log(message):
+    # drop protobuf noise if debug is off
+    NOISE_PATTERNS = (
+        "Error while parsing FromRadio",
+        "Error parsing message with type 'meshtastic.protobuf.FromRadio'",
+        "Traceback",
+        "meshtastic/stream_interface.py",
+        "meshtastic/mesh_interface.py",
+    )
+    if not DEBUG_ENABLED and any(p in message for p in NOISE_PATTERNS):
+        return
+
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     log_entry = f"{timestamp} - {message}"
     script_logs.append(log_entry)
@@ -43,25 +96,33 @@ def add_script_log(message):
                 with open(SCRIPT_LOG_FILE, "w", encoding="utf-8") as f:
                     f.writelines(last_lines)
         with open(SCRIPT_LOG_FILE, "a", encoding="utf-8") as f:
+            # append a real newline
             f.write(log_entry + "\n")
     except Exception as e:
         print(f"⚠️ Could not write to {SCRIPT_LOG_FILE}: {e}")
-
 # Redirect stdout and stderr to our log while still printing to terminal.
 class StreamToLogger(object):
     def __init__(self, logger_func):
         self.logger_func = logger_func
         self.terminal = sys.__stdout__
+        # reuse noise patterns from the Proto filter
+        self.noise_patterns = _ProtoNoiseFilter.NOISY if ' _ProtoNoiseFilter' in globals() else []
+
     def write(self, buf):
+        # still print everything to the terminal...
         self.terminal.write(buf)
-        if buf.strip():
-            self.logger_func(buf.strip())
+        text = buf.strip()
+        if not text:
+            return
+        # only log to script_logs if not noisy, or if debug is on
+        if DEBUG_ENABLED or not any(p in text for p in self.noise_patterns):
+            self.logger_func(text)
+
     def flush(self):
         self.terminal.flush()
 
 sys.stdout = StreamToLogger(add_script_log)
 sys.stderr = StreamToLogger(add_script_log)
-
 # -----------------------------
 # Global Connection & Reset Status
 # -----------------------------
@@ -96,7 +157,7 @@ BANNER = (
 ██║ ╚═╝ ██║███████╗███████║██║  ██║   ██║   ██║  ██║███████║   ██║   ██║╚██████╗              ██║  ██║██║
 ╚═╝     ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝ ╚═════╝              ╚═╝  ╚═╝╚═╝
 
-Meshtastic-AI Alpha v0.4.2 by: MR_TBOT (https://mr-tbot.com)
+Meshtastic-AI BETA v0.5.0 by: MR_TBOT (https://mr-tbot.com)
 https://github.com/mr-tbot/meshtastic-ai/
     \033[32m 
 Messaging Dashboard Access: http://localhost:5000/dashboard \033[38;5;214m
@@ -104,7 +165,7 @@ Messaging Dashboard Access: http://localhost:5000/dashboard \033[38;5;214m
     "\033[0m"
     "\033[31m"
     """
-DISCLAIMER: This is alpha software and should not be relied upon for mission critical tasks or emergencies.
+DISCLAIMER: This is beta software and should not be relied upon for mission critical tasks or emergencies.
 Modification of this code for nefarious purposes is strictly frowned upon. Please use responsibly.
 
 (Use at your own risk. For feedback or issues, see the GitHub link above.)
@@ -144,26 +205,24 @@ except FileNotFoundError:
     print(f"⚠️ {MOTD_FILE} not found.")
     motd_content = "No MOTD available."
 
-DEBUG_ENABLED = bool(config.get("debug", False))
 
-def dprint(*args, **kwargs):
-    if DEBUG_ENABLED:
-        print(*args, **kwargs)
-
-def info_print(*args, **kwargs):
-    if not DEBUG_ENABLED:
-        print(*args, **kwargs)
-
-if DEBUG_ENABLED:
-    print(f"DEBUG: Loaded main config => {config}")
 
 # -----------------------------
 # AI Provider & Other Config Vars
 # -----------------------------
+DEBUG_ENABLED = bool(config.get("debug", False))
 AI_PROVIDER = config.get("ai_provider", "lmstudio").lower()
 SYSTEM_PROMPT = config.get("system_prompt", "You are a helpful assistant responding to mesh network chats.")
 LMSTUDIO_URL = config.get("lmstudio_url", "http://localhost:1234/v1/chat/completions")
 LMSTUDIO_TIMEOUT = config.get("lmstudio_timeout", 60)
+LMSTUDIO_CHAT_MODEL = config.get(
+    "lmstudio_chat_model",
+    "llama-3.2-1b-instruct-uncensored",
+)
+LMSTUDIO_EMBEDDING_MODEL = config.get(
+    "lmstudio_embedding_model",
+    "text-embedding-nomic-embed-text-v1.5",	
+)	
 OPENAI_API_KEY = config.get("openai_api_key", "")
 OPENAI_MODEL = config.get("openai_model", "gpt-3.5-turbo")
 OPENAI_TIMEOUT = config.get("openai_timeout", 30)
@@ -213,6 +272,7 @@ SMTP_PASS = config.get("smtp_pass", None)
 ALERT_EMAIL_TO = config.get("alert_email_to", None)
 
 SERIAL_PORT = config.get("serial_port", "")
+SERIAL_BAUD = int(config.get("serial_baud", 921600))  # ← NEW ● default 921600
 USE_WIFI = bool(config.get("use_wifi", False))
 WIFI_HOST = config.get("wifi_host", None)
 WIFI_PORT = int(config.get("wifi_port", 4403))
@@ -374,21 +434,23 @@ def send_direct_chunks(interface, text, destinationId):
         else:
             info_print(f"[Info] Direct chunk {i+1}/{len(chunks)} to {destinationId} sent.")
 
-def send_to_lmstudio(user_message):
+def send_to_lmstudio(user_message: str):
+    """Chat/completion request to LM Studio with explicit model name."""
     dprint(f"send_to_lmstudio: user_message='{user_message}'")
-    info_print("[Info] Routing user message to LMStudio...")
+    info_print("[Info] Routing user message to LMStudio…")
     payload = {
+        "model": LMSTUDIO_CHAT_MODEL,  # **mandatory when multiple models loaded**
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_message}
+            {"role": "user",   "content": user_message},
         ],
-        "max_tokens": MAX_RESPONSE_LENGTH
+        "max_tokens": MAX_RESPONSE_LENGTH,
     }
     try:
         response = requests.post(LMSTUDIO_URL, json=payload, timeout=LMSTUDIO_TIMEOUT)
         if response.status_code == 200:
             j = response.json()
-            dprint(f"LMStudio raw => {j}")
+            dprint(f"LMStudio raw ⇒ {j}")
             ai_resp = (
                 j.get("choices", [{}])[0]
                  .get("message", {})
@@ -401,7 +463,28 @@ def send_to_lmstudio(user_message):
     except Exception as e:
         print(f"⚠️ LMStudio request failed: {e}")
         return None
-
+def lmstudio_embed(text: str):
+    """Return an embedding vector (if you ever need it)."""
+    payload = {
+        "model": LMSTUDIO_EMBEDDING_MODEL,
+        "input": text,
+															   
+    }
+    try:
+        r = requests.post(
+            "http://localhost:1234/v1/embeddings",
+            json=payload,
+            timeout=LMSTUDIO_TIMEOUT,
+        )
+        if r.status_code == 200:
+            vec = r.json().get("data", [{}])[0].get("embedding")
+            return vec
+        else:
+            dprint(f"LMStudio embed error {r.status_code}: {r.text}")
+					   
+    except Exception as exc:
+        dprint(f"LMStudio embed exception: {exc}")
+    return None
 def send_to_openai(user_message):
     dprint(f"send_to_openai: user_message='{user_message}'")
     info_print("[Info] Routing user message to OpenAI...")
@@ -783,58 +866,84 @@ def get_nodes_api():
     if interface and hasattr(interface, "nodes"):
         for nid in interface.nodes:
             sn = get_node_shortname(nid)
-            node_list.append({"id": nid, "shortName": sn})
+            ln = get_node_fullname(nid)
+            node_list.append({
+                "id": nid,
+                "shortName": sn,
+                "longName": ln
+            })
     return jsonify(node_list)
 
 @app.route("/connection_status", methods=["GET"], endpoint="connection_status_info")
 def connection_status_info():
     return jsonify({"status": connection_status, "error": last_error_message})
 
+@app.route("/logs_stream")
+def logs_stream():
+    def generate():
+        last_index = 0
+        while True:
+            # apply your noise filter
+            visible = [
+                line for line in script_logs
+                if DEBUG_ENABLED or not any(p in line for p in _ProtoNoiseFilter.NOISY)
+            ]
+            # send only the new lines
+            if last_index < len(visible):
+                for line in visible[last_index:]:
+                    # each SSE “data:” is one log line
+                    yield f"data: {line}\n\n"
+                last_index = len(visible)
+            time.sleep(0.5)
+
+    headers = {
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no"   # for nginx, disables proxy buffering
+    }
+    return Response(
+        stream_with_context(generate()),
+        headers=headers,
+        mimetype="text/event-stream"
+    )
+
 @app.route("/logs", methods=["GET"])
 def logs():
     uptime = datetime.now(timezone.utc) - server_start_time
     uptime_str = str(uptime).split('.')[0]
+
+    # build a regex that matches any protobuf noise
+    noise_re = re.compile(r"protobuf|DecodeError|ParseFromString", re.IGNORECASE)
+
+    # include only non-noisy lines unless DEBUG_ENABLED
+    visible = [
+        line for line in script_logs
+        if DEBUG_ENABLED or not noise_re.search(line)
+    ]
+    log_text = "\n".join(visible)
+
     html = f"""<html>
-<head>
-  <title>Meshtastic-AI Logs</title>
-  <style>
-    body {{
-      background: #000;
-      color: #fff;
-      font-family: Arial, sans-serif;
-      padding: 20px;
-    }}
-    h1, h2 {{
-      color: var(--theme-color);
-    }}
-    pre {{
-      background: #111;
-      padding: 10px;
-      border: 1px solid var(--theme-color);
-      overflow-x: auto;
-    }}
-    .summary {{
-      margin-bottom: 20px;
-    }}
-    a {{
-      color: var(--theme-color);
-      text-decoration: none;
-    }}
-  </style>
-</head>
-<body>
-  <h1>Script Logs</h1>
-  <div class="summary">
-    <p><strong>Uptime:</strong> {uptime_str}</p>
-    <p><strong>Restarts (since current launch):</strong> {restart_count}</p>
-    <p><a href="/dashboard">Back to Dashboard</a></p>
-  </div>
-  <h2>Log Entries</h2>
-  <pre>{"\n".join(script_logs)}</pre>
-</body>
+  <head>
+    <meta http-equiv="refresh" content="1">
+    <title>Meshtastic-AI Logs</title>
+    <style>
+      body {{ background:#000; color:#fff; font-family:monospace; padding:20px; }}
+      pre {{ white-space: pre-wrap; word-break: break-word; }}
+    </style>
+  </head>
+  <body>
+    <h1>Script Logs</h1>
+    <div><strong>Uptime:</strong> {uptime_str}</div>
+    <div><strong>Restarts:</strong> {restart_count}</div>
+    <pre id="logbox">{log_text}</pre>
+    <script>
+      // once the page renders, scroll to the bottom
+      document.addEventListener("DOMContentLoaded", () => {{
+        window.scrollTo(0, document.body.scrollHeight);
+      }});
+    </script>
+  </body>
 </html>"""
     return html
-
 # -----------------------------
 # Revised Discord Webhook Route for Inbound Messages
 # -----------------------------
@@ -899,457 +1008,981 @@ def twilio_webhook():
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
     channel_names = config.get("channel_names", {})
+    channel_names_json = json.dumps(channel_names)
+
+    # Prepare node GPS and beacon info for JS
+    node_gps_info = {}
+    if interface and hasattr(interface, "nodes"):
+        for nid, ninfo in interface.nodes.items():
+            pos = ninfo.get("position", {})
+            lat = pos.get("latitude")
+            lon = pos.get("longitude")
+            tstamp = pos.get("time")
+            # Try all possible hop keys, fallback to None
+            hops = (
+                ninfo.get("hopLimit")
+                or ninfo.get("hop_count")
+                or ninfo.get("hopCount")
+                or ninfo.get("numHops")
+                or ninfo.get("num_hops")
+                or ninfo.get("hops")
+                or None
+            )
+            # Convert tstamp (epoch) to readable UTC if present
+            if tstamp:
+                try:
+                    dt = datetime.fromtimestamp(tstamp, timezone.utc)
+                    tstr = dt.strftime("%Y-%m-%d %H:%M:%S UTC")
+                except Exception:
+                    tstr = str(tstamp)
+            else:
+                tstr = None
+            node_gps_info[str(nid)] = {
+                "lat": lat,
+                "lon": lon,
+                "beacon_time": tstr,
+                "hops": hops,
+            }
+    node_gps_info_json = json.dumps(node_gps_info)
+
+    # Get connected node's GPS for distance calculation
+    my_lat, my_lon, _ = get_node_location(interface.myNode.nodeNum) if interface and hasattr(interface, "myNode") and interface.myNode else (None, None, None)
+    my_gps_json = json.dumps({"lat": my_lat, "lon": my_lon})
+
     html = """
 <html>
 <head>
   <title>Meshtastic AI Dashboard</title>
   <style>
-    :root {
-      --theme-color: #ffa500;
-    }
-    body {
-      background: #000;
-      color: #fff;
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding-top: 120px;
-      transition: filter 0.5s linear;
-    }
-    #connectionStatus {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      z-index: 350;
-      text-align: center;
-      padding: 0;
-      font-size: 14px;
-      font-weight: bold;
-      display: block;
-    }
-    .header-buttons {
-      position: fixed;
-      top: 0;
-      right: 0;
-      z-index: 400;
-    }
-    .header-buttons a {
-      background: var(--theme-color);
-      color: #000;
-      padding: 8px 12px;
-      margin: 5px;
-      text-decoration: none;
-      border-radius: 4px;
-      font-weight: bold;
-    }
-    #ticker {
-      position: fixed;
-      top: 70px;
-      background: #111;
-      color: var(--theme-color);
-      white-space: nowrap;
-      overflow: hidden;
-      width: 100%;
-      padding: 5px 0;
-      z-index: 250;
-      font-size: 36px;
-    }
-    #ticker p {
-      display: inline-block;
-      margin: 0;
-      animation: tickerScroll 30s linear infinite;
-    }
-    @keyframes tickerScroll {
-      0%   { transform: translateX(100%); }
-      100% { transform: translateX(-100%); }
-    }
-    #sendForm {
-      margin: 20px;
-      padding: 20px;
-      background: #111;
-      border: 2px solid var(--theme-color);
-      border-radius: 10px;
-    }
-    .three-col {
-      display: flex;
-      flex-direction: row;
-      gap: 20px;
-      margin: 20px;
-      height: calc(100vh - 220px);
-    }
-    .three-col .col:nth-child(1),
-    .three-col .col:nth-child(3) {
-      flex: 2;
-      overflow-y: auto;
-    }
-    .three-col .col:nth-child(2) {
-      flex: 1;
-      overflow-y: auto;
-    }
-    .lcars-panel {
-      background: #111;
-      padding: 20px;
-      border: 2px solid var(--theme-color);
-      border-radius: 10px;
-    }
-    .lcars-panel h2 {
-      color: var(--theme-color);
-      margin-top: 0;
-    }
-    .message {
-      border: 1px solid var(--theme-color);
-      border-radius: 4px;
-      margin: 5px;
-      padding: 5px;
-    }
-    .message.outgoing {
-      background: #222;
-    }
-    .message.newMessage {
-      border-color: #00ff00;
-    }
-    .timestamp {
-      font-size: 0.8em;
-      color: #666;
-    }
-    .btn {
-      margin-left: 10px;
-      padding: 2px 6px;
-      font-size: 0.8em;
-      cursor: pointer;
-    }
-    .switch {
-      position: relative;
-      display: inline-block;
-      width: 60px;
-      height: 34px;
-      vertical-align: middle;
-    }
+    :root { --theme-color: #ffa500; }
+    body { background: #000; color: #fff; font-family: Arial, sans-serif; margin: 0; padding-top: 120px; transition: filter 0.5s linear; }
+    #connectionStatus { position: fixed; top: 0; left: 0; width: 100%; z-index: 350; text-align: center; padding: 0; font-size: 14px; font-weight: bold; display: block; }
+    .header-buttons { position: fixed; top: 0; right: 0; z-index: 400; }
+    .header-buttons a { background: var(--theme-color); color: #000; padding: 8px 12px; margin: 5px; text-decoration: none; border-radius: 4px; font-weight: bold; }
+    #ticker-container { position: fixed; top: 20px; left: 0; width: 100vw; z-index: 300; height: 50px; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+    #ticker { background: #111; color: var(--theme-color); white-space: nowrap; overflow: hidden; width: 100vw; min-width: 100vw; max-width: 100vw; padding: 5px 0; font-size: 36px; display: none; position: relative; border-bottom: 2px solid var(--theme-color); min-height: 50px; pointer-events: auto; }
+    #ticker p { display: inline-block; margin: 0; animation: tickerScroll 30s linear infinite; vertical-align: middle; min-width: 100vw; }
+    #ticker .dismiss-btn { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); font-size: 18px; background: #222; color: #fff; border: 1px solid var(--theme-color); border-radius: 4px; cursor: pointer; padding: 2px 10px; z-index: 10; }
+    @keyframes tickerScroll { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
+    #sendForm { margin: 20px; padding: 20px; background: #111; border: 2px solid var(--theme-color); border-radius: 10px; }
+    .three-col { display: flex; flex-direction: row; gap: 20px; margin: 20px; height: calc(100vh - 220px); }
+    .three-col .col:nth-child(1), .three-col .col:nth-child(3) { flex: 2; overflow-y: auto; }
+    .three-col .col:nth-child(2) { flex: 1; overflow-y: auto; }
+    .lcars-panel { background: #111; padding: 20px; border: 2px solid var(--theme-color); border-radius: 10px; }
+    .lcars-panel h2 { color: var(--theme-color); margin-top: 0; }
+    .message { border: 1px solid var(--theme-color); border-radius: 4px; margin: 5px; padding: 5px; }
+    .message.outgoing { background: #222; }
+    .message.newMessage { border-color: #00ff00; background: #1a2; }
+    .message.recentNode { border-color: #00bfff; background: #113355; }
+    .timestamp { font-size: 0.8em; color: #666; }
+    .btn { margin-left: 10px; padding: 2px 6px; font-size: 0.8em; cursor: pointer; }
+    .switch { position: relative; display: inline-block; width: 60px; height: 34px; vertical-align: middle; }
     .switch input { opacity: 0; width: 0; height: 0; }
-    .slider {
-      position: absolute;
-      cursor: pointer;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background-color: #ccc;
-      transition: .4s;
-    }
-    .slider:before {
-      position: absolute;
-      content: "";
-      height: 26px;
-      width: 26px;
-      left: 4px;
-      bottom: 4px;
-      background-color: white;
-      transition: .4s;
-    }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; }
+    .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; }
     input:checked + .slider { background-color: #2196F3; }
     input:focus + .slider { box-shadow: 0 0 1px #2196F3; }
     input:checked + .slider:before { transform: translateX(26px); }
     .slider.round { border-radius: 34px; }
     .slider.round:before { border-radius: 50%; }
-    #charCounter {
-      font-size: 0.9em;
-      color: #ccc;
-      text-align: right;
-      margin-top: 5px;
-    }
-    .settings-panel {
-      background: #111;
-      margin: 20px;
-      padding: 20px;
-      border: 2px solid var(--theme-color);
-      border-radius: 10px;
-      position: fixed;
-      bottom: 50px;
-      left: 20px;
-      right: 20px;
-      z-index: 300;
-      display: none;
-    }
-    .settings-toggle {
-      background: var(--theme-color);
-      color: #000;
-      padding: 10px;
-      text-align: center;
-      cursor: pointer;
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      z-index: 300;
-      border-top: 2px solid #fff;
-    }
+    #charCounter { font-size: 0.9em; color: #ccc; text-align: right; margin-top: 5px; }
+    .nodeItem { margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--theme-color); display: flex; flex-direction: column; align-items: flex-start; flex-wrap: wrap; }
+    .nodeItem.recentNode { border-bottom: 2px solid #00bfff; background: #113355; }
+    .nodeMainLine { font-weight: bold; font-size: 1.1em; }
+    .nodeLongName { color: #aaa; font-size: 0.98em; margin-top: 2px; }
+    .nodeInfoLine { margin-top: 2px; font-size: 0.95em; color: #ccc; display: flex; flex-wrap: wrap; gap: 10px; }
+    .nodeGPS { margin-left: 0; }
+    .nodeBeacon { color: #aaa; font-size: 0.92em; }
+    .nodeHops { color: #6cf; font-size: 0.92em; }
+    .nodeMapBtn { margin-left: 0; background: #222; color: #fff; border: 1px solid #ffa500; border-radius: 4px; padding: 2px 6px; font-size: 1em; cursor: pointer; text-decoration: none; }
+    .nodeMapBtn:hover { background: #ffa500; color: #000; }
+    .channel-header { display: flex; align-items: center; gap: 10px; }
+    .reply-btn { margin-left: 10px; padding: 2px 8px; font-size: 0.85em; background: #222; color: var(--theme-color); border: 1px solid var(--theme-color); border-radius: 4px; cursor: pointer; }
+    .mark-read-btn { margin-left: 10px; padding: 2px 8px; font-size: 0.85em; background: #222; color: #0f0; border: 1px solid #0f0; border-radius: 4px; cursor: pointer; }
+    .mark-all-read-btn { margin-left: 10px; padding: 2px 8px; font-size: 0.85em; background: #222; color: #ff0; border: 1px solid #ff0; border-radius: 4px; cursor: pointer; }
+    /* Threaded DM styles */
+    .dm-thread { margin-bottom: 16px; border-left: 3px solid var(--theme-color); padding-left: 10px; }
+    .dm-thread .message { margin-left: 0; }
+    .dm-thread .reply-btn { margin-top: 5px; }
+    .dm-thread .thread-replies { margin-left: 30px; border-left: 2px dashed #555; padding-left: 10px; }
+    /* Hide Discord section by default */
+    #discordSection { display: none; }
+    /* Node sort controls */
+    .nodeSortBar { margin-bottom: 10px; }
+    .nodeSortBar label { margin-right: 8px; }
+    .nodeSortBar select { background: #222; color: #fff; border: 1px solid var(--theme-color); border-radius: 4px; padding: 2px 8px; }
+    /* Full width search bar for nodes */
+    #nodeSearch { width: 100%; margin-bottom: 10px; font-size: 1em; padding: 6px; box-sizing: border-box; }
+    /* UI Settings panel hidden by default */
+    .settings-panel { display: none; background: #111; border: 2px solid var(--theme-color); border-radius: 10px; padding: 20px; margin: 20px; }
+    .settings-toggle { background: var(--theme-color); color: #000; padding: 8px 12px; margin: 20px; border-radius: 4px; font-weight: bold; cursor: pointer; display: inline-block; }
+    .settings-toggle.active { background: #222; color: #ffa500; }
+    /* Timezone selector */
+    #timezoneSelect { margin-left: 10px; }
   </style>
+
   <script>
-  // Global variables to store the last DM and channel targets
-  var lastDMTarget = null;
-  var lastChannelTarget = null;
+    // --- Mark as Read/Unread State ---
+    let readDMs = JSON.parse(localStorage.getItem("readDMs") || "[]");
+    let readChannels = JSON.parse(localStorage.getItem("readChannels") || "{}");
 
-  // Reply using the last direct message target
-  function replyToLastDM() {
-    if (lastDMTarget !== null) {
-      replyToMessage('direct', lastDMTarget);
-    } else {
-      alert("No direct message target available.");
+    function saveReadDMs() {
+      localStorage.setItem("readDMs", JSON.stringify(readDMs));
     }
-  }
+    function saveReadChannels() {
+      localStorage.setItem("readChannels", JSON.stringify(readChannels));
+    }
+    function markDMAsRead(ts) {
+      if (!readDMs.includes(ts)) {
+        readDMs.push(ts);
+        saveReadDMs();
+        fetchMessagesAndNodes();
+      }
+    }
+    function markAllDMsAsRead() {
+      if (!confirm("Are you sure you want to mark ALL direct messages as read?")) return;
+      let dms = allMessages.filter(m => m.direct);
+      readDMs = dms.map(m => m.timestamp);
+      saveReadDMs();
+      fetchMessagesAndNodes();
+    }
+    function markChannelAsRead(channelIdx) {
+      if (!confirm("Are you sure you want to mark ALL messages in this channel as read?")) return;
+      let msgs = allMessages.filter(m => !m.direct && m.channel_idx == channelIdx);
+      if (!readChannels) readChannels = {};
+      readChannels[channelIdx] = msgs.map(m => m.timestamp);
+      saveReadChannels();
+      fetchMessagesAndNodes();
+    }
+    function isDMRead(ts) {
+      return readDMs.includes(ts);
+    }
+    function isChannelMsgRead(ts, channelIdx) {
+      return readChannels && readChannels[channelIdx] && readChannels[channelIdx].includes(ts);
+    }
 
-  // Reply using the last broadcast channel target
-  function replyToLastChannel() {
-    if (lastChannelTarget !== null) {
-      replyToMessage('broadcast', lastChannelTarget);
-    } else {
-      alert("No broadcast channel target available.");
+    // --- Ticker Dismissal State ---
+    function setTickerDismissed(ts) {
+      // Store the timestamp of the dismissed message and expiry
+      localStorage.setItem("tickerDismissed", JSON.stringify({ts: ts, until: Date.now() + 30000}));
     }
-  }
+    function isTickerDismissed(ts) {
+      let obj = {};
+      try { obj = JSON.parse(localStorage.getItem("tickerDismissed") || "{}"); } catch(e){}
+      if (!obj.ts || !obj.until) return false;
+      // Only dismiss if the same message and not expired
+      return obj.ts === ts && Date.now() < obj.until;
+    }
 
-    // Set the incoming sound source and save it in localStorage
-    function setIncomingSound(url) {
-      var soundElem = document.getElementById('incomingSound');
-      if (soundElem) {
-        soundElem.src = url;
-        localStorage.setItem("incomingSoundURL", url);
+    // --- Timezone Offset State ---
+    function getTimezoneOffset() {
+      let tz = localStorage.getItem("meshtastic_ui_tz_offset");
+      if (tz === null || isNaN(Number(tz))) return 0;
+      return Number(tz);
     }
-  }
-      // On load, retrieve stored incoming sound URL
-    window.addEventListener("load", function() {
-      var storedSoundURL = localStorage.getItem("incomingSoundURL");
-      if (storedSoundURL) {
-        document.getElementById("soundURL").value = storedSoundURL;
-        setIncomingSound(storedSoundURL);
-      }
-    });
-  </script>
-  <script>
-    var hueRotateInterval = null;
-    var currentHue = 0;
-    function applyThemeColor(color) {
-      document.documentElement.style.setProperty("--theme-color", color);
-      localStorage.setItem("uiThemeColor", color);
+    function setTimezoneOffset(val) {
+      localStorage.setItem("meshtastic_ui_tz_offset", String(val));
     }
-    function startHueRotate(speed) {
-      var degPerSec = 360 / speed;
-      if (hueRotateInterval) clearInterval(hueRotateInterval);
-      hueRotateInterval = setInterval(function(){
-        currentHue = (currentHue + degPerSec * 0.1) % 360;
-        document.body.style.filter = "hue-rotate(" + currentHue + "deg)";
-      }, 100);
-      localStorage.setItem("hueRotateSpeed", speed);
-    }
-    function stopHueRotate() {
-      if (hueRotateInterval) {
-        clearInterval(hueRotateInterval);
-        hueRotateInterval = null;
-      }
-      document.body.style.filter = "none";
-    }
-    function toggleHueRotate(enabled, speed) {
-      if (enabled) {
-        startHueRotate(speed);
-        localStorage.setItem("hueRotateEnabled", "true");
-      } else {
-        stopHueRotate();
-        localStorage.setItem("hueRotateEnabled", "false");
-      }
-    }
-    function toggleSettingsPanel() {
-      var panel = document.getElementById("settingsPanel");
-      var toggleBtn = document.getElementById("settingsToggle");
-      if(panel.style.display === "none" || panel.style.display === "") {
-        panel.style.display = "block";
-        toggleBtn.textContent = "Hide UI Settings";
-      } else {
-        panel.style.display = "none";
-        toggleBtn.textContent = "Show UI Settings";
-      }
-    }
-    async function fetchMessagesAndNodes() {
-      try {
-        var msgResp = await fetch("/messages");
-        var msgData = await msgResp.json();
-        updateMessagesUI(msgData);
-        var nodeResp = await fetch("/nodes");
-        var nodeData = await nodeResp.json();
-        updateNodesUI(nodeData);
-      } catch (e) {
-        console.error("Error fetching data:", e);
-      }
-    }
-function updateMessagesUI(messages) {
-  messages = messages.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  
-  // Update global targets from the most recent messages
-  lastDMTarget = null;
-  lastChannelTarget = null;
-  for (var i = 0; i < messages.length; i++) {
-    var m = messages[i];
-    if (m.direct && m.node_id && lastDMTarget === null) {
-      lastDMTarget = m.node_id;
-    }
-    if (!m.direct && m.channel_idx !== null && lastChannelTarget === null) {
-      lastChannelTarget = m.channel_idx;
-    }
-  }
 
-  var channelDiv = document.getElementById("channelDiv");
-  var dmMessagesDiv = document.getElementById("dmMessagesDiv");
-  var discordDiv = document.getElementById("discordMessagesDiv");
-  if (channelDiv) channelDiv.innerHTML = "";
-  if (dmMessagesDiv) dmMessagesDiv.innerHTML = "";
-  if (discordDiv) discordDiv.innerHTML = "";
-  var now = new Date().getTime();
-  messages.forEach(function(m) {
-    var msgTime = new Date(m.timestamp).getTime();
-    var wrap = document.createElement("div");
-    wrap.className = "message" + (m.emergency ? " emergency" : "");
-    if (m.node === "WebUI") {
-      wrap.classList.add("outgoing");
-    }
-    if (m.node !== "WebUI" && m.node !== "AI-Bot" && m.node !== "Home Assistant") {
-      var replyBtn = document.createElement("button");
-      replyBtn.className = "btn";
-      replyBtn.textContent = "Reply";
-      if (m.direct && m.node_id) {
-        replyBtn.onclick = function(){ replyToMessage('direct', m.node_id); };
-      } else if (!m.direct && m.channel_idx !== null) {
-        replyBtn.onclick = function(){ replyToMessage('broadcast', m.channel_idx); };
-      }
-      wrap.appendChild(replyBtn);
-    }
-    if (now - msgTime < 7200000) {
-      wrap.classList.add("newMessage");
-    }
-    var icon = "";
-    if (m.direct) {
-      icon = (m.node === "WebUI") ? "📤" : "📥";
-    } else {
-      icon = (m.node === "WebUI") ? "📣" : "📢";
-    }
-    wrap.innerHTML += "<div class='timestamp'>" + icon + " " + m.timestamp + " | " + m.node + "</div>" +
-                       "<div>" + m.message + "</div>";
-    // Place messages based on the node field
-    if (m.node.indexOf("Discord") !== -1) {
-      if (discordDiv) discordDiv.appendChild(wrap);
-    } else if (m.direct) {
-      if (dmMessagesDiv) dmMessagesDiv.appendChild(wrap);
-    } else {
-      if (channelDiv) channelDiv.appendChild(wrap);
-    }
-  });
-}
+    // Globals for reply targets
+    var lastDMTarget = null;
+    var lastChannelTarget = null;
+    let allNodes = [];
+    let allMessages = [];
+    let lastMessageTimestamp = null;
+    let tickerTimeout = null;
+    let tickerLastShownTimestamp = null;
+    let nodeGPSInfo = """ + node_gps_info_json + """;
+    let myGPS = """ + my_gps_json + """;
 
-    function updateNodesUI(nodes) {
-      var nodeListDiv = document.getElementById("nodeListDiv");
-      var destSelect = document.getElementById("destNode");
-      if(nodeListDiv) nodeListDiv.innerHTML = "";
-      if(destSelect) destSelect.innerHTML = "<option value=''>--Select Node--</option>";
-      nodes.forEach(function(n) {
-        var d = document.createElement("div");
-        d.className = "nodeItem";
-        d.textContent = n.shortName + " (" + n.id + ")";
-        var dmBtn = document.createElement("button");
-        dmBtn.className = "btn";
-        dmBtn.textContent = "DM";
-        dmBtn.onclick = function(){ dmToNode(n.id, n.shortName); };
-        d.appendChild(dmBtn);
-        if(nodeListDiv) nodeListDiv.appendChild(d);
-        if(destSelect) {
-          var opt = document.createElement("option");
-          opt.value = n.id;
-          opt.text = n.shortName + " (" + n.id + ")";
-          destSelect.appendChild(opt);
+    // --- Node Sorting ---
+    let nodeSortKey = localStorage.getItem("nodeSortKey") || "name";
+    let nodeSortDir = localStorage.getItem("nodeSortDir") || "asc";
+
+    function setNodeSort(key, dir) {
+      nodeSortKey = key;
+      nodeSortDir = dir;
+      localStorage.setItem("nodeSortKey", key);
+      localStorage.setItem("nodeSortDir", dir);
+      updateNodesUI(allNodes, false);
+    }
+
+    function compareNodes(a, b) {
+      // Helper for null/undefined
+      function safe(v) { return v === undefined || v === null ? "" : v; }
+      // For distance, use haversine if both have GPS, else sort GPS-enabled first
+      if (nodeSortKey === "distance") {
+        let aGPS = nodeGPSInfo[String(a.id)];
+        let bGPS = nodeGPSInfo[String(b.id)];
+        let aHas = aGPS && aGPS.lat != null && aGPS.lon != null;
+        let bHas = bGPS && bGPS.lat != null && bGPS.lon != null;
+        if (!aHas && !bHas) return 0;
+        if (aHas && !bHas) return -1;
+        if (!aHas && bHas) return 1;
+        let distA = calcDistance(myGPS.lat, myGPS.lon, aGPS.lat, aGPS.lon);
+        let distB = calcDistance(myGPS.lat, myGPS.lon, bGPS.lat, bGPS.lon);
+        return (distA - distB) * (nodeSortDir === "asc" ? 1 : -1);
+      }
+      if (nodeSortKey === "gps") {
+        let aGPS = nodeGPSInfo[String(a.id)];
+        let bGPS = nodeGPSInfo[String(b.id)];
+        let aHas = aGPS && aGPS.lat != null && aGPS.lon != null;
+        let bHas = bGPS && bGPS.lat != null && bGPS.lon != null;
+        if (aHas && !bHas) return nodeSortDir === "asc" ? -1 : 1;
+        if (!aHas && bHas) return nodeSortDir === "asc" ? 1 : -1;
+        return 0;
+      }
+      if (nodeSortKey === "name") {
+        let cmp = safe(a.shortName).localeCompare(safe(b.shortName), undefined, {sensitivity:"base"});
+        return cmp * (nodeSortDir === "asc" ? 1 : -1);
+      }
+      if (nodeSortKey === "beacon") {
+        let aGPS = nodeGPSInfo[String(a.id)];
+        let bGPS = nodeGPSInfo[String(b.id)];
+        let aTime = aGPS && aGPS.beacon_time ? Date.parse(aGPS.beacon_time.replace(" UTC","Z")) : 0;
+        let bTime = bGPS && bGPS.beacon_time ? Date.parse(bGPS.beacon_time.replace(" UTC","Z")) : 0;
+        return (bTime - aTime) * (nodeSortDir === "asc" ? -1 : 1);
+      }
+      if (nodeSortKey === "hops") {
+        let aGPS = nodeGPSInfo[String(a.id)];
+        let bGPS = nodeGPSInfo[String(b.id)];
+        let aH = aGPS && aGPS.hops != null ? aGPS.hops : 99;
+        let bH = bGPS && bGPS.hops != null ? bGPS.hops : 99;
+        return (aH - bH) * (nodeSortDir === "asc" ? 1 : -1);
+      }
+      return 0;
+    }
+
+    // Haversine formula (km)
+    function calcDistance(lat1, lon1, lat2, lon2) {
+      if (
+        lat1 == null || lon1 == null ||
+        lat2 == null || lon2 == null
+      ) return 99999;
+      let toRad = x => x * Math.PI / 180;
+      let R = 6371;
+      let dLat = toRad(lat2 - lat1);
+      let dLon = toRad(lon2 - lon1);
+      let a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+      let c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
+
+    // --- UI Settings State ---
+    let uiSettings = {
+      themeColor: "#ffa500",
+      hueRotateEnabled: false,
+      hueRotateSpeed: 10,
+      soundURL: ""
+    };
+    let hueRotateInterval = null;
+    let currentHue = 0;
+
+    function toggleMode(force) {
+      if (typeof force !== "undefined") {
+        document.getElementById('modeSwitch').checked = force === 'direct';
+      }
+      const dm = document.getElementById('modeSwitch').checked;
+      document.getElementById('dmField').style.display = dm ? 'block' : 'none';
+      document.getElementById('channelField').style.display = dm ? 'none' : 'block';
+      document.getElementById('modeLabel').textContent = dm ? 'Direct' : 'Broadcast';
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+      document.getElementById('modeSwitch').addEventListener('change', function() {
+        toggleMode();
+      });
+      document.getElementById('settingsToggle').addEventListener('click', function() {
+        const panel = document.getElementById('settingsPanel');
+        if (panel.style.display === 'none' || panel.style.display === '') {
+          panel.style.display = 'block';
+          this.textContent = "Hide UI Settings";
+        } else {
+          panel.style.display = 'none';
+          this.textContent = "Show UI Settings";
         }
       });
+      document.getElementById('settingsPanel').style.display = 'none'; // Hide settings panel by default
+      document.getElementById('settingsToggle').textContent = "Show UI Settings";
+      document.getElementById('nodeSearch').addEventListener('input', function() {
+        filterNodes(this.value, false);
+      });
+      document.getElementById('destNodeSearch').addEventListener('input', function() {
+        filterNodes(this.value, true);
+      });
+
+      // Node sort controls
+      document.getElementById('nodeSortKey').addEventListener('change', function() {
+        setNodeSort(this.value, nodeSortDir);
+      });
+      document.getElementById('nodeSortDir').addEventListener('change', function() {
+        setNodeSort(nodeSortKey, this.value);
+      });
+
+      // --- UI Settings: Load from localStorage ---
+      loadUISettings();
+
+      // Set initial values in settings panel
+      document.getElementById('uiColorPicker').value = uiSettings.themeColor;
+      document.getElementById('hueRotateEnabled').checked = uiSettings.hueRotateEnabled;
+      document.getElementById('hueRotateSpeed').value = uiSettings.hueRotateSpeed;
+      document.getElementById('soundURL').value = uiSettings.soundURL;
+
+      // Apply settings on load
+      applyThemeColor(uiSettings.themeColor);
+      if (uiSettings.hueRotateEnabled) startHueRotate(uiSettings.hueRotateSpeed);
+      setIncomingSound(uiSettings.soundURL);
+
+      // Apply button
+      document.getElementById('applySettingsBtn').addEventListener('click', function() {
+        // Read values
+        uiSettings.themeColor = document.getElementById('uiColorPicker').value;
+        uiSettings.hueRotateEnabled = document.getElementById('hueRotateEnabled').checked;
+        uiSettings.hueRotateSpeed = parseFloat(document.getElementById('hueRotateSpeed').value);
+        // For soundURL, only allow local file path from file input
+        var fileInput = document.getElementById('soundFile');
+        if (fileInput && fileInput.files.length > 0) {
+          var file = fileInput.files[0];
+          var url = URL.createObjectURL(file);
+          uiSettings.soundURL = url;
+          document.getElementById('soundURL').value = file.name;
+        }
+        saveUISettings();
+        applyThemeColor(uiSettings.themeColor);
+        if (uiSettings.hueRotateEnabled) {
+          startHueRotate(uiSettings.hueRotateSpeed);
+        } else {
+          stopHueRotate();
+        }
+        setIncomingSound(uiSettings.soundURL);
+        // Save timezone offset
+        setTimezoneOffset(document.getElementById('timezoneSelect').value);
+        fetchMessagesAndNodes();
+      });
+
+      // Listen for file input change to update sound preview
+      document.getElementById('soundFile').addEventListener('change', function() {
+        if (this.files.length > 0) {
+          var file = this.files[0];
+          var url = URL.createObjectURL(file);
+          uiSettings.soundURL = url;
+          document.getElementById('soundURL').value = file.name;
+          setIncomingSound(url);
+        }
+      });
+
+      // Set initial sort controls
+      document.getElementById('nodeSortKey').value = nodeSortKey;
+      document.getElementById('nodeSortDir').value = nodeSortDir;
+
+      // Set timezone selector
+      let tzSel = document.getElementById('timezoneSelect');
+      let tz = getTimezoneOffset();
+      tzSel.value = tz;
+    });
+
+    // --- UI Settings Functions ---
+    function saveUISettings() {
+      // Only persist the file name for sound, not the blob URL
+      let settingsToSave = Object.assign({}, uiSettings);
+      if (settingsToSave.soundURL && settingsToSave.soundURL.startsWith('blob:')) {
+        settingsToSave.soundURL = document.getElementById('soundURL').value;
+      }
+      localStorage.setItem("meshtastic_ui_settings", JSON.stringify(settingsToSave));
     }
+    function loadUISettings() {
+      try {
+        let s = localStorage.getItem("meshtastic_ui_settings");
+        if (s) {
+          let parsed = JSON.parse(s);
+          Object.assign(uiSettings, parsed);
+        }
+      } catch (e) {}
+    }
+    function applyThemeColor(color) {
+      document.documentElement.style.setProperty('--theme-color', color);
+    }
+    function startHueRotate(speed) {
+      stopHueRotate();
+      hueRotateInterval = setInterval(function() {
+        currentHue = (currentHue + 1) % 360;
+        document.body.style.filter = `hue-rotate(${currentHue}deg)`;
+      }, Math.max(5, 1000 / Math.max(1, speed)));
+    }
+    function stopHueRotate() {
+      if (hueRotateInterval) clearInterval(hueRotateInterval);
+      hueRotateInterval = null;
+      document.body.style.filter = "";
+      currentHue = 0;
+    }
+    function toggleHueRotate(enabled, speed) {
+      uiSettings.hueRotateEnabled = enabled;
+      uiSettings.hueRotateSpeed = speed;
+      saveUISettings();
+      if (enabled) startHueRotate(speed);
+      else stopHueRotate();
+    }
+    function setIncomingSound(url) {
+      let audio = document.getElementById('incomingSound');
+      audio.src = url || "";
+      uiSettings.soundURL = url;
+      saveUISettings();
+    }
+
+    function replyToMessage(mode, target) {
+      toggleMode(mode);
+      if (mode === 'direct') {
+        const dest = document.getElementById('destNode');
+        dest.value = target;
+        const name = dest.selectedOptions[0] ? dest.selectedOptions[0].text.split(' (')[0] : '';
+        document.getElementById('messageBox').value = '@' + name + ': ';
+      } else {
+        const ch = document.getElementById('channelSel');
+        ch.value = target;
+        document.getElementById('messageBox').value = '';
+      }
+    }
+
+    function dmToNode(nodeId, shortName, replyToTs) {
+      toggleMode('direct');
+      document.getElementById('destNode').value = nodeId;
+      if (replyToTs) {
+        // Prefill with quoted message if replying to a thread
+        let threadMsg = allMessages.find(m => m.timestamp === replyToTs);
+        let quoted = threadMsg ? `> ${threadMsg.message}\n` : '';
+        document.getElementById('messageBox').value = quoted + '@' + shortName + ': ';
+      } else {
+        document.getElementById('messageBox').value = '@' + shortName + ': ';
+      }
+    }
+
+    function replyToLastDM() {
+      if (lastDMTarget !== null) {
+        const opt = document.querySelector(`#destNode option[value="${lastDMTarget}"]`);
+        const shortName = opt ? opt.text.split(' (')[0] : '';
+        dmToNode(lastDMTarget, shortName);
+      } else {
+        alert("No direct message target available.");
+      }
+    }
+
+    function replyToLastChannel() {
+      if (lastChannelTarget !== null) {
+        toggleMode('broadcast');
+        document.getElementById('channelSel').value = lastChannelTarget;
+        document.getElementById('messageBox').value = '';
+      } else {
+        alert("No broadcast channel target available.");
+      }
+    }
+
+    // Data fetch & UI updates
+    const CHANNEL_NAMES = """ + json.dumps(channel_names) + """;
+
+    function getNowUTC() {
+      return new Date(new Date().toISOString().slice(0, 19) + "Z");
+    }
+
+    function getTZAdjusted(tsStr) {
+      // tsStr is "YYYY-MM-DD HH:MM:SS UTC"
+      let tz = getTimezoneOffset();
+      if (!tsStr) return "";
+      let dt = new Date(tsStr.replace(" UTC", "Z"));
+      if (isNaN(dt.getTime())) return tsStr;
+      dt.setHours(dt.getHours() + tz);
+      let pad = n => n < 10 ? "0" + n : n;
+      return dt.getFullYear() + "-" + pad(dt.getMonth()+1) + "-" + pad(dt.getDate()) + " " +
+             pad(dt.getHours()) + ":" + pad(dt.getMinutes()) + ":" + pad(dt.getSeconds()) +
+             (tz === 0 ? " UTC" : (tz > 0 ? " UTC+" + tz : " UTC" + tz));
+    }
+
+    function isRecent(tsStr, minutes) {
+      if (!tsStr) return false;
+      let now = getNowUTC();
+      let msgTime = new Date(tsStr.replace(" UTC", "Z"));
+      return (now - msgTime) < minutes * 60 * 1000;
+    }
+
+    async function fetchMessagesAndNodes() {
+      try {
+        let msgs = await (await fetch("/messages")).json();
+        allMessages = msgs;
+        let nodes = await (await fetch("/nodes")).json();
+        allNodes = nodes;
+        updateMessagesUI(msgs);
+        updateNodesUI(nodes, false);
+        updateNodesUI(nodes, true);
+        updateDirectMessagesUI(msgs, nodes);
+        highlightRecentNodes(nodes);
+        showLatestMessageTicker(msgs);
+        updateDiscordMessagesUI(msgs);
+      } catch (e) { console.error(e); }
+    }
+
+    function updateMessagesUI(messages) {
+      // Reverse the order to show the newest messages first
+      const groups = {};
+      messages.slice().reverse().forEach(m => {
+        if (!m.direct && m.channel_idx != null) {
+          (groups[m.channel_idx] = groups[m.channel_idx] || []).push(m);
+        }
+      });
+
+      const channelDiv = document.getElementById("channelDiv");
+      channelDiv.innerHTML = "";
+      Object.keys(groups).sort().forEach(ch => {
+        const name = CHANNEL_NAMES[ch] || `Channel ${ch}`;
+        // Channel header with reply and mark all as read button
+        const headerWrap = document.createElement("div");
+        headerWrap.className = "channel-header";
+        const header = document.createElement("h3");
+        header.textContent = `${ch} – ${name}`;
+        header.style.margin = 0;
+        headerWrap.appendChild(header);
+
+        // Add reply button for channel
+        const replyBtn = document.createElement("button");
+        replyBtn.textContent = "Send to Channel";
+        replyBtn.className = "reply-btn";
+        replyBtn.onclick = function() {
+          replyToMessage('broadcast', ch);
+        };
+        headerWrap.appendChild(replyBtn);
+
+        // Mark all as read for this channel
+        const markAllBtn = document.createElement("button");
+        markAllBtn.textContent = "Mark all as read";
+        markAllBtn.className = "mark-all-read-btn";
+        markAllBtn.onclick = function() {
+          markChannelAsRead(ch);
+        };
+        headerWrap.appendChild(markAllBtn);
+
+        channelDiv.appendChild(headerWrap);
+
+        groups[ch].forEach(m => {
+          if (isChannelMsgRead(m.timestamp, ch)) return; // Hide read messages
+          const wrap = document.createElement("div");
+          wrap.className = "message";
+          if (isRecent(m.timestamp, 60)) wrap.classList.add("newMessage");
+          const ts = document.createElement("div");
+          ts.className = "timestamp";
+          ts.textContent = `📢 ${getTZAdjusted(m.timestamp)} | ${m.node}`;
+          const body = document.createElement("div");
+          body.textContent = m.message;
+          wrap.append(ts, body);
+
+          // Mark as read button
+          const markBtn = document.createElement("button");
+          markBtn.textContent = "Mark as read";
+          markBtn.className = "mark-read-btn";
+          markBtn.onclick = function() {
+            if (!readChannels[ch]) readChannels[ch] = [];
+            if (!readChannels[ch].includes(m.timestamp)) {
+              readChannels[ch].push(m.timestamp);
+              saveReadChannels();
+              fetchMessagesAndNodes();
+            }
+          };
+          wrap.appendChild(markBtn);
+
+          channelDiv.appendChild(wrap);
+        });
+        channelDiv.appendChild(document.createElement("hr"));
+      });
+
+      // Update global reply targets
+      lastDMTarget = null;
+      lastChannelTarget = null;
+      for (const m of messages) {
+        if (m.direct && m.node_id != null && lastDMTarget === null) {
+          lastDMTarget = m.node_id;
+        }
+        if (!m.direct && m.channel_idx != null && lastChannelTarget === null) {
+          lastChannelTarget = m.channel_idx;
+        }
+        if (lastDMTarget != null && lastChannelTarget != null) break;
+      }
+    }
+
+    // --- DM Threaded UI ---
+    function updateDirectMessagesUI(messages, nodes) {
+      // Group DMs by node_id, then by thread (reply_to)
+      const dmDiv = document.getElementById("dmMessagesDiv");
+      dmDiv.innerHTML = "";
+
+      // Only direct messages, newest first
+      let dms = messages.filter(m => m.direct && !isDMRead(m.timestamp)).slice().reverse();
+
+      // Group by node_id
+      let threads = {};
+      dms.forEach(m => {
+        if (!threads[m.node_id]) threads[m.node_id] = [];
+        threads[m.node_id].push(m);
+      });
+
+      // Mark all as read button for DMs
+      if (dms.length > 0) {
+        const markAllBtn = document.createElement("button");
+        markAllBtn.textContent = "Mark all as read";
+        markAllBtn.className = "mark-all-read-btn";
+        markAllBtn.onclick = function() {
+          markAllDMsAsRead();
+        };
+        dmDiv.appendChild(markAllBtn);
+      }
+
+      Object.keys(threads).forEach(nodeId => {
+        const node = allNodes.find(n => n.id == nodeId);
+        const shortName = node ? node.shortName : nodeId;
+        const threadDiv = document.createElement("div");
+        threadDiv.className = "dm-thread";
+
+        // Find root messages (no reply_to)
+        let rootMsgs = threads[nodeId].filter(m => !m.reply_to);
+
+        rootMsgs.forEach(rootMsg => {
+          const wrap = document.createElement("div");
+          wrap.className = "message";
+          if (isRecent(rootMsg.timestamp, 60)) wrap.classList.add("newMessage");
+          const ts = document.createElement("div");
+          ts.className = "timestamp";
+          ts.textContent = `📩 ${getTZAdjusted(rootMsg.timestamp)} | ${rootMsg.node}`;
+          const body = document.createElement("div");
+          body.textContent = rootMsg.message;
+          wrap.append(ts, body);
+
+          // Add reply button for root
+          const replyBtn = document.createElement("button");
+          replyBtn.textContent = "Reply";
+          replyBtn.className = "reply-btn";
+          replyBtn.onclick = function() {
+            dmToNode(nodeId, shortName, rootMsg.timestamp);
+          };
+          wrap.appendChild(replyBtn);
+
+          // Mark as read button for root
+          const markBtn = document.createElement("button");
+          markBtn.textContent = "Mark as read";
+          markBtn.className = "mark-read-btn";
+          markBtn.onclick = function() {
+            markDMAsRead(rootMsg.timestamp);
+          };
+          wrap.appendChild(markBtn);
+
+          threadDiv.appendChild(wrap);
+
+          // Find replies to this root
+          let replies = threads[nodeId].filter(m => m.reply_to === rootMsg.timestamp);
+          if (replies.length) {
+            const repliesDiv = document.createElement("div");
+            repliesDiv.className = "thread-replies";
+            replies.forEach(replyMsg => {
+              const replyWrap = document.createElement("div");
+              replyWrap.className = "message";
+              if (isRecent(replyMsg.timestamp, 60)) replyWrap.classList.add("newMessage");
+              const rts = document.createElement("div");
+              rts.className = "timestamp";
+              rts.textContent = `↪️ ${getTZAdjusted(replyMsg.timestamp)} | ${replyMsg.node}`;
+              const rbody = document.createElement("div");
+              rbody.textContent = replyMsg.message;
+              replyWrap.append(rts, rbody);
+
+              // Reply to reply (threaded)
+              const replyBtn2 = document.createElement("button");
+              replyBtn2.textContent = "Reply";
+              replyBtn2.className = "reply-btn";
+              replyBtn2.onclick = function() {
+                dmToNode(nodeId, shortName, replyMsg.timestamp);
+              };
+              replyWrap.appendChild(replyBtn2);
+
+              // Mark as read button for reply
+              const markBtn2 = document.createElement("button");
+              markBtn2.textContent = "Mark as read";
+              markBtn2.className = "mark-read-btn";
+              markBtn2.onclick = function() {
+                markDMAsRead(replyMsg.timestamp);
+              };
+              replyWrap.appendChild(markBtn2);
+
+              repliesDiv.appendChild(replyWrap);
+            });
+            threadDiv.appendChild(repliesDiv);
+          }
+        });
+
+        dmDiv.appendChild(threadDiv);
+      });
+    }
+
+    function updateNodesUI(nodes, isDest) {
+      // isDest: false = available nodes panel, true = destination node dropdown
+      if (!isDest) {
+        const list = document.getElementById("nodeListDiv");
+        let filter = document.getElementById('nodeSearch').value.toLowerCase();
+        list.innerHTML = "";
+        let filtered = nodes.filter(n =>
+          (n.shortName && n.shortName.toLowerCase().includes(filter)) ||
+          (n.longName && n.longName.toLowerCase().includes(filter)) ||
+          String(n.id).toLowerCase().includes(filter)
+        );
+        // Sort
+        filtered.sort(compareNodes);
+
+        filtered.forEach(n => {
+          const d = document.createElement("div");
+          d.className = "nodeItem";
+          if (isRecentNode(n.id)) d.classList.add("recentNode");
+
+          // Main line: Short name and ID
+          const mainLine = document.createElement("div");
+          mainLine.className = "nodeMainLine";
+          mainLine.innerHTML = `<span>${n.shortName || ""}</span> <span style="color:#ffa500;">(${n.id})</span>`;
+          d.appendChild(mainLine);
+
+          // Long name (if present)
+          if (n.longName && n.longName !== n.shortName) {
+            const longName = document.createElement("div");
+            longName.className = "nodeLongName";
+            longName.textContent = n.longName;
+            d.appendChild(longName);
+          }
+
+          // Info line 1: GPS/map, distance
+          const infoLine1 = document.createElement("div");
+          infoLine1.className = "nodeInfoLine";
+          let gps = nodeGPSInfo[String(n.id)];
+          if (gps && gps.lat != null && gps.lon != null) {
+            // Map button (emoji)
+            const mapA = document.createElement("a");
+            mapA.href = `https://www.google.com/maps/search/?api=1&query=${gps.lat},${gps.lon}`;
+            mapA.target = "_blank";
+            mapA.className = "nodeMapBtn";
+            mapA.title = "Show on Google Maps";
+            mapA.innerHTML = "🗺️";
+            infoLine1.appendChild(mapA);
+
+            // Distance
+            if (myGPS && myGPS.lat != null && myGPS.lon != null) {
+              let dist = calcDistance(myGPS.lat, myGPS.lon, gps.lat, gps.lon);
+              if (dist < 99999) {
+                const distSpan = document.createElement("span");
+                distSpan.className = "nodeGPS";
+                distSpan.title = "Approximate distance from connected node";
+                distSpan.innerHTML = `📏 ${dist.toFixed(2)} km`;
+                infoLine1.appendChild(distSpan);
+              }
+            }
+          }
+          d.appendChild(infoLine1);
+
+          // Info line 2: Beacon/reporting time
+          const infoLine2 = document.createElement("div");
+          infoLine2.className = "nodeInfoLine";
+          if (gps && gps.beacon_time) {
+            const beacon = document.createElement("span");
+            beacon.className = "nodeBeacon";
+            beacon.title = "Last beacon/reporting time";
+            beacon.innerHTML = `🕒 ${getTZAdjusted(gps.beacon_time)}`;
+            infoLine2.appendChild(beacon);
+          }
+          d.appendChild(infoLine2);
+
+          // Info line 3: Hops
+          const infoLine3 = document.createElement("div");
+          infoLine3.className = "nodeInfoLine";
+          // Only show hops if available and not null/undefined/""
+          if (gps && gps.hops != null && gps.hops !== "" && gps.hops !== undefined) {
+            const hops = document.createElement("span");
+            hops.className = "nodeHops";
+            hops.title = "Hops from this node";
+            hops.innerHTML = `⛓️ ${gps.hops} hop${gps.hops==1?"":"s"}`;
+            infoLine3.appendChild(hops);
+            d.appendChild(infoLine3);
+          }
+          // If hops is not available, do not show this section at all
+
+          // DM button
+          const btn = document.createElement("button");
+          btn.textContent = "DM";
+          btn.className = "btn";
+          btn.onclick = () => dmToNode(n.id, n.shortName);
+          d.append(btn);
+
+          list.appendChild(d);
+        });
+      } else {
+        const sel  = document.getElementById("destNode");
+        const prevNode = sel.value;
+        sel.innerHTML  = "<option value=''>--Select Node--</option>";
+        let filter = document.getElementById('destNodeSearch').value.toLowerCase();
+        let filtered = nodes.filter(n =>
+          (n.shortName && n.shortName.toLowerCase().includes(filter)) ||
+          (n.longName && n.longName.toLowerCase().includes(filter)) ||
+          String(n.id).toLowerCase().includes(filter)
+        );
+        filtered.forEach(n => {
+          const opt = document.createElement("option");
+          opt.value = n.id;
+          opt.innerHTML = `${n.shortName} (${n.id})`;
+          sel.append(opt);
+        });
+        sel.value = prevNode;
+      }
+    }
+
+    function filterNodes(val, isDest) {
+      updateNodesUI(allNodes, isDest);
+    }
+
+    // Track recently discovered nodes (seen in last hour)
+    function isRecentNode(nodeId) {
+      // Find the latest message from this node
+      let found = allMessages.slice().reverse().find(m => m.node_id == nodeId);
+      if (!found) return false;
+      return isRecent(found.timestamp, 60);
+    }
+
+    function highlightRecentNodes(nodes) {
+      // Called after updateNodesUI
+      // No-op: handled by .recentNode class in updateNodesUI
+    }
+
+    // Show latest inbound message in ticker, dismissable, timeout after 30s, and persist dismiss across refreshes
+    function showLatestMessageTicker(messages) {
+      // Show both channel and direct inbound messages, but not outgoing (WebUI, Discord, Twilio, DiscordPoll, AI_NODE_NAME)
+      // and not AI responses (reply_to is not null)
+      let inbound = messages.filter(m =>
+        m.node !== "WebUI" &&
+        m.node !== "Discord" &&
+        m.node !== "Twilio" &&
+        m.node !== "DiscordPoll" &&
+        m.node !== """ + json.dumps(AI_NODE_NAME) + """ &&
+        (!m.reply_to) // Only show original messages, not replies (AI responses)
+      );
+      if (!inbound.length) return hideTicker();
+      let latest = inbound[inbound.length - 1];
+      if (!latest || !latest.message) return hideTicker();
+
+      // If dismissed, don't show
+      if (isTickerDismissed(latest.timestamp)) return hideTicker();
+
+      // Only show ticker if not already shown for this message
+      if (tickerLastShownTimestamp === latest.timestamp) return;
+      tickerLastShownTimestamp = latest.timestamp;
+
+      let ticker = document.getElementById('ticker');
+      let tickerMsg = ticker.querySelector('p');
+      tickerMsg.textContent = latest.message;
+      ticker.style.display = 'block';
+
+      // Show dismiss button at far right, on top
+      let dismissBtn = ticker.querySelector('.dismiss-btn');
+      if (!dismissBtn) {
+        dismissBtn = document.createElement('button');
+        dismissBtn.textContent = "Dismiss";
+        dismissBtn.className = "dismiss-btn";
+        dismissBtn.onclick = function(e) {
+          e.stopPropagation();
+          ticker.style.display = 'none';
+          setTickerDismissed(latest.timestamp);
+          if (tickerTimeout) clearTimeout(tickerTimeout);
+        };
+        ticker.appendChild(dismissBtn);
+      } else {
+        // Always update dismiss button to dismiss this message
+        dismissBtn.onclick = function(e) {
+          e.stopPropagation();
+          ticker.style.display = 'none';
+          setTickerDismissed(latest.timestamp);
+          if (tickerTimeout) clearTimeout(tickerTimeout);
+        };
+      }
+
+      // Remove after 30s and persist dismiss
+      if (tickerTimeout) clearTimeout(tickerTimeout);
+      tickerTimeout = setTimeout(() => {
+        ticker.style.display = 'none';
+        setTickerDismissed(latest.timestamp);
+        tickerLastShownTimestamp = null;
+      }, 30000);
+    }
+
+    function hideTicker() {
+      let ticker = document.getElementById('ticker');
+      ticker.style.display = 'none';
+      tickerLastShownTimestamp = null;
+      if (tickerTimeout) {
+        clearTimeout(tickerTimeout);
+        tickerTimeout = null;
+      }
+    }
+
     function pollStatus() {
       fetch("/connection_status")
-        .then(response => response.json())
-        .then(data => {
-          var statusDiv = document.getElementById("connectionStatus");
-          if(data.status !== "Connected") {
-            statusDiv.style.background = "red";
-            statusDiv.style.height = "40px";
-            statusDiv.textContent = "Connection Error: " + data.error;
+        .then(r => r.json())
+        .then(d => {
+          const s = document.getElementById("connectionStatus");
+          if (d.status != "Connected") {
+            s.style.background = "red";
+            s.style.height = "40px";
+            s.textContent = `Connection Error: ${d.error}`;
           } else {
-            statusDiv.style.background = "green";
-            statusDiv.style.height = "20px";
-            statusDiv.textContent = "Connected";
+            s.style.background = "green";
+            s.style.height = "20px";
+            s.textContent = "Connected";
           }
         })
-        .catch(err => console.error("Error fetching connection status:", err));
+        .catch(e => console.error(e));
     }
     setInterval(pollStatus, 5000);
+
     function onPageLoad() {
       setInterval(fetchMessagesAndNodes, 10000);
       fetchMessagesAndNodes();
+      toggleMode(); // Set initial mode
     }
-    var function_reply_js = `
-function replyToMessage(mode, target) {
-  if (mode === 'direct') {
-    document.getElementById('modeSwitch').checked = true;
-    toggleMode();
-    document.getElementById('destNode').value = target;
-    var destText = document.getElementById('destNode').options[document.getElementById('destNode').selectedIndex].text;
-    var shortName = destText.split(" (")[0];
-    document.getElementById('messageBox').value = "Reply to @" + shortName + ": ";
-  } else if (mode === 'broadcast') {
-    document.getElementById('modeSwitch').checked = false;
-    toggleMode();
-    document.getElementById('channelSel').value = target;
-    document.getElementById('messageBox').value = "Reply in Channel " + target + ": ";
-  }
-}
-function dmToNode(nodeId, shortName) {
-  document.getElementById('modeSwitch').checked = true;
-  toggleMode();
-  var destSelect = document.getElementById('destNode');
-  for (var i = 0; i < destSelect.options.length; i++) {
-    if (destSelect.options[i].value === nodeId) {
-      destSelect.selectedIndex = i;
-      break;
-    }
-  }
-  document.getElementById('messageBox').value = "@" + shortName + ": ";
-}
-`;
-    eval(function_reply_js);
-    function toggleMode() {
-      var isDM = document.getElementById('modeSwitch').checked;
-      if (isDM) {
-        document.getElementById('dmField').style.display = 'block';
-        document.getElementById('channelField').style.display = 'none';
-        document.getElementById('modeLabel').textContent = "Direct";
-      } else {
-        document.getElementById('dmField').style.display = 'none';
-        document.getElementById('channelField').style.display = 'block';
-        document.getElementById('modeLabel').textContent = "Broadcast";
+    window.addEventListener("load", onPageLoad);
+
+    // --- Discord Messages Section ---
+    function updateDiscordMessagesUI(messages) {
+      // Only show Discord messages if any exist
+      let discordMsgs = messages.filter(m => m.node === "Discord" || m.node === "DiscordPoll");
+      let discordSection = document.getElementById("discordSection");
+      let discordDiv = document.getElementById("discordMessagesDiv");
+      if (discordMsgs.length === 0) {
+        discordSection.style.display = "none";
+        discordDiv.innerHTML = "";
+        return;
       }
+      discordSection.style.display = "block";
+      discordDiv.innerHTML = "";
+      discordMsgs.forEach(m => {
+        const wrap = document.createElement("div");
+        wrap.className = "message";
+        if (isRecent(m.timestamp, 60)) wrap.classList.add("newMessage");
+        const ts = document.createElement("div");
+        ts.className = "timestamp";
+        ts.textContent = `💬 ${getTZAdjusted(m.timestamp)} | ${m.node}`;
+        const body = document.createElement("div");
+        body.textContent = m.message;
+        wrap.append(ts, body);
+        discordDiv.appendChild(wrap);
+      });
     }
-    window.addEventListener("load", function(){
-      document.getElementById('modeSwitch').addEventListener('change', toggleMode);
-    });
-    function updateCharCounter() {
-      var text = document.getElementById('messageBox').value;
-      var count = text.length;
-      var chunks = Math.ceil(count / 200);
-      if(chunks > 5) { chunks = 5; }
-      document.getElementById('charCounter').textContent = "Characters: " + count + "/1000, Chunks: " + chunks + "/5";
-    }
-    window.addEventListener("load", function(){
-      document.getElementById('messageBox').addEventListener('input', updateCharCounter);
-    });
   </script>
 </head>
 <body onload="onPageLoad()">
   <div id="connectionStatus"></div>
-  <div class="header-buttons">
-    <a href="/logs" target="_blank">Logs</a>
+  <div class="header-buttons"><a href="/logs" target="_blank">Logs</a></div>
+  <div id="ticker-container">
+    <div id="ticker"><p></p></div>
   </div>
-  <div id="flashDiv" style="display:none;">NEW MESSAGE!</div>
-  <div id="ticker"><p></p></div>
-  <audio id="beepAudio" src="data:audio/wav;base64,UklGRgAAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+/+cAAACAAAACAAACAAACAAACAAAACAAACAAAAAAAAAAA"></audio>
   <audio id="incomingSound"></audio>
+
   <div class="lcars-panel" id="sendForm">
     <h2>Send a Message</h2>
     <form method="POST" action="/ui_send">
@@ -1358,33 +1991,33 @@ function dmToNode(nodeId, shortName) {
         <input type="checkbox" id="modeSwitch">
         <span class="slider round"></span>
       </label>
-      <span id="modeLabel">Direct</span>
-      <br/><br/>
-      <div id="dmField" style="display: none;">
-        <label>Destination Node:</label><br/>
-        <select id="destNode" name="destination_node">
-          <option value="">--Select Node--</option>
-        </select><br/><br/>
+      <span id="modeLabel">Broadcast</span><br><br>
+
+      <div id="dmField" style="display:none;">
+        <label>Destination Node:</label><br>
+        <input type="text" id="destNodeSearch" placeholder="Search destination nodes..."><br>
+        <select id="destNode" name="destination_node"></select><br><br>
       </div>
-      <div id="channelField" style="display: block;">
-        <label>Channel:</label><br/>
+
+      <div id="channelField" style="display:block;">
+        <label>Channel:</label><br>
         <select id="channelSel" name="channel_index">
 """
     for i in range(8):
-        ch_name = channel_names.get(str(i), f"Channel {i}")
-        html += f"<option value='{i}'>{i} - {ch_name}</option>"
-    html += """
-        </select><br/><br/>
+        name = channel_names.get(str(i), f"Channel {i}")
+        html += f"          <option value='{i}'>{i} - {name}</option>\n"
+    html += """        </select><br><br>
       </div>
-      <label>Message:</label><br/>
+
+      <label>Message:</label><br>
       <textarea id="messageBox" name="message" rows="3" style="width:80%;"></textarea>
-      <div id="charCounter">Characters: 0/1000, Chunks: 0/5</div>
-      <br/>
+      <div id="charCounter">Characters: 0/1000, Chunks: 0/5</div><br>
       <button type="submit">Send</button>
       <button type="button" onclick="replyToLastDM()">Reply to Last DM</button>
       <button type="button" onclick="replyToLastChannel()">Reply to Last Channel</button>
     </form>
   </div>
+
   <div class="three-col">
     <div class="col">
       <div class="lcars-panel">
@@ -1395,6 +2028,22 @@ function dmToNode(nodeId, shortName) {
     <div class="col">
       <div class="lcars-panel">
         <h2>Available Nodes</h2>
+        <input type="text" id="nodeSearch" placeholder="Search nodes by name, id, or long name...">
+        <div class="nodeSortBar">
+          <label for="nodeSortKey">Sort by:</label>
+          <select id="nodeSortKey">
+            <option value="name">Name</option>
+            <option value="beacon">Last Reporting Time</option>
+            <option value="hops">Number of Hops</option>
+            <option value="gps">GPS Enabled</option>
+            <option value="distance">Distance</option>
+          </select>
+          <label for="nodeSortDir">Order:</label>
+          <select id="nodeSortDir">
+            <option value="asc">Ascending</option>
+            <option value="desc">Descending</option>
+          </select>
+        </div>
         <div id="nodeListDiv"></div>
       </div>
     </div>
@@ -1405,30 +2054,37 @@ function dmToNode(nodeId, shortName) {
       </div>
     </div>
   </div>
-        <div class="lcars-panel" style="margin:20px;">
-        <h2>Discord Messages</h2>
-        <div id="discordMessagesDiv"></div>
-      </div>
-  <div class="settings-toggle" id="settingsToggle" onclick="toggleSettingsPanel()">Show UI Settings</div>
+
+  <div class="lcars-panel" id="discordSection" style="margin:20px;">
+    <h2>Discord Messages</h2>
+    <div id="discordMessagesDiv"></div>
+  </div>
+
+  <div class="settings-toggle" id="settingsToggle">Show UI Settings</div>
   <div class="settings-panel" id="settingsPanel">
     <h2>UI Settings</h2>
     <label for="uiColorPicker">Theme Color:</label>
-    <input type="color" id="uiColorPicker" value="#ffa500" onchange="applyThemeColor(this.value)">
-    <br/><br/>
+    <input type="color" id="uiColorPicker" value="#ffa500"><br><br>
     <label for="hueRotateEnabled">Enable Hue Rotation:</label>
-    <input type="checkbox" id="hueRotateEnabled" onchange="toggleHueRotate(this.checked, parseFloat(document.getElementById('hueRotateSpeed').value))">
-    <br/><br/>
-    <label for="hueRotateSpeed">Hue Rotation Speed (seconds per full rotation):</label>
-    <input type="range" id="hueRotateSpeed" min="5" max="60" step="0.1" value="10" onchange="if(document.getElementById('hueRotateEnabled').checked){ startHueRotate(parseFloat(this.value)); }">
-    <br/><br/>
-    <label for="soundURL">Incoming Message Sound URL:</label>
-    <input type="text" id="soundURL" placeholder="/static/sound.mp3" onchange="setIncomingSound(this.value)">
+    <input type="checkbox" id="hueRotateEnabled"><br><br>
+    <label for="hueRotateSpeed">Hue Rotation Speed:</label>
+    <input type="range" id="hueRotateSpeed" min="5" max="60" step="0.1" value="10"><br><br>
+    <label for="soundFile">Incoming Message Sound (local file):</label>
+    <input type="file" id="soundFile" accept="audio/*"><br>
+    <input type="text" id="soundURL" placeholder="No file selected" readonly style="background:#222;color:#fff;border:none;"><br><br>
+    <label for="timezoneSelect">Timezone Offset (hours):</label>
+    <select id="timezoneSelect">
+"""
+    # Timezone selector: -12 to +14
+    for tz in range(-12, 15):
+        html += f'      <option value="{tz}">{tz:+d}</option>\n'
+    html += """    </select><br><br>
+    <button id="applySettingsBtn" type="button">Apply Settings</button>
   </div>
 </body>
 </html>
 """
     return html
-
 @app.route("/ui_send", methods=["POST"])
 def ui_send():
     message = request.form.get("message", "").strip()
@@ -1485,32 +2141,50 @@ def send_message():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 def connect_interface():
+    """Return a Meshtastic interface with the baud rate from config.
+
+    Resolution order:
+      1. Wi‑Fi TCP bridge
+      2. Local MeshInterface()
+      3. USB SerialInterface (explicit path or auto‑detect)
+    """
     global connection_status, last_error_message
     try:
+        # 1️⃣  Wi‑Fi bridge -------------------------------------------------
         if USE_WIFI and WIFI_HOST and TCPInterface is not None:
-            print(f"Trying TCPInterface to {WIFI_HOST}:{WIFI_PORT} ...")
-            connection_status = "Connected"
-            last_error_message = ""
+            print(f"TCPInterface → {WIFI_HOST}:{WIFI_PORT}")
+            connection_status, last_error_message = "Connected", ""
             return TCPInterface(hostname=WIFI_HOST, portNumber=WIFI_PORT)
+
+        # 2️⃣  Local mesh interface ---------------------------------------
         if USE_MESH_INTERFACE and MESH_INTERFACE_AVAILABLE:
-            print("Trying MeshInterface() for ephemeral direct messages ...")
-            connection_status = "Connected"
-            last_error_message = ""
+            print("MeshInterface() for direct‑radio mode")
+            connection_status, last_error_message = "Connected", ""
             return MeshInterface()
+
+        # 3️⃣  USB serial --------------------------------------------------
         if SERIAL_PORT:
-            print(f"Trying SerialInterface on port '{SERIAL_PORT}' ...")
-            connection_status = "Connected"
-            last_error_message = ""
-            return meshtastic.serial_interface.SerialInterface(devPath=SERIAL_PORT)
+            print(f"SerialInterface on '{SERIAL_PORT}' (default baud, will switch to {SERIAL_BAUD}) …")
+            iface = meshtastic.serial_interface.SerialInterface(devPath=SERIAL_PORT)
         else:
-            print("Trying SerialInterface (auto-detect) ...")
-            connection_status = "Connected"
-            last_error_message = ""
-            return meshtastic.serial_interface.SerialInterface()
-    except Exception as e:
-        connection_status = "Disconnected"
-        last_error_message = str(e)
-        add_script_log(f"Connection error: {e}")
+            print(f"SerialInterface auto‑detect (default baud, will switch to {SERIAL_BAUD}) …")
+            iface = meshtastic.serial_interface.SerialInterface()
+
+        # Attempt to change baudrate after opening
+        try:
+            ser = getattr(iface, "_serial", None)
+            if ser is not None and hasattr(ser, "baudrate"):
+                ser.baudrate = SERIAL_BAUD
+                print(f"Baudrate switched to {SERIAL_BAUD}")
+        except Exception as e:
+            print(f"⚠️ could not set baudrate to {SERIAL_BAUD}: {e}")
+
+        connection_status, last_error_message = "Connected", ""
+        return iface
+
+    except Exception as exc:
+        connection_status, last_error_message = "Disconnected", str(exc)
+        add_script_log(f"Connection error: {exc}")
         raise
 
 def thread_excepthook(args):
