@@ -4,13 +4,25 @@ services:
     container_name: meshtastic-ai
     ports:
       - "5000:5000"
-#    devices:
-#      - "/dev/ttyUSB0:/dev/ttyUSB0"  #uncomment if using USB & assign device ID to forward to the container.
+    privileged: true
+   # environment:  // UNCOMMENT IF USING SERIAL AND MODIFY FOR YOUR MACHINE.  
+   #   - MESH_INTERFACE=/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0
     volumes:
-      - ./config/config.json:/app/config.json
-      - ./config/commands_config.json:/app/commands_config.json
-      - ./config/motd.json:/app/motd.json
-      - ./logs/script.log:/app/script.log
-      - ./logs/messages.log:/app/messages.log
-      - ./logs/messages_archive.json:/app/messages_archive.json
+   #   - /dev/serial/by-id:/dev/serial/by-id:ro  //UNCOMMENT IF USING SERIAL.
+   #   - /dev:/dev  //UNCOMMENT IF USING SERIAL.
+      # Mount config files
+      - ./meshtastic-ai/config/config.json:/app/config.json
+      - ./meshtastic-ai/config/commands_config.json:/app/commands_config.json
+      - ./meshtastic-ai/config/motd.json:/app/motd.json
+
+      # Mount log files
+      - ./meshtastic-ai/logs/messages.log:/app/messages.log
+      - ./meshtastic-ai/logs/messages_archive.json:/app/messages_archive.json
+      - ./meshtastic-ai/logs/script.log:/app/script.log
+
     restart: unless-stopped
+  #  healthcheck:  // OPTIONAL SERIAL DEVICE HEALTH CHECK - MODIFY FOR YOUR SERIAL DEVICE.
+  #    test: ["CMD", "ls", "/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0"]
+  #    interval: 30s
+  #    retries: 3
+  #    timeout: 5s
