@@ -44,7 +44,7 @@
 - **Discord Integration Enhancements**  
   - Route messages to and from Discord.
   - New configuration options and a dedicated `/discord_webhook` endpoint allow for inbound Discord message processing.
-- **Windows‑Focused - Linux compatability confirmed!  Thanks Milo Oh!
+- **Windows & Linux Focused**
   - Official support for Windows environments with installation guides; instructions for Linux availble now - MacOS coming soon!
 
 ---
