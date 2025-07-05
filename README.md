@@ -20,6 +20,9 @@
 
 ---
 
+![image](https://github.com/user-attachments/assets/2f8d9f9d-0dc5-4833-822f-f3484421ad10)
+
+
 ## Features
 
 - **Multiple AI Providers**  
