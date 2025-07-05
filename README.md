@@ -255,7 +255,7 @@ The Meshtastic logo trademark is the trademark of Meshtastic LLC.
    - These files are placed in order to prevent docker from replacing these with directories on first start and throwing errors.
    - Make any changes to config files as needed before moving forward.
 
-File strcture should look like this:
+File structure should look like this:
 
    ```bash
    mesh-ai/
