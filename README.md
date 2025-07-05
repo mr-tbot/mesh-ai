@@ -24,7 +24,10 @@
 ![image](https://github.com/user-attachments/assets/bdf08934-3a80-4dc6-8a91-78e33c34db59)
 The Meshtastic logo trademark is the trademark of Meshtastic LLC.
 
-
+![image](https://github.com/user-attachments/assets/8ea74ff1-bb34-4e3e-9514-01a98a469cb2)
+An example of an awesome Raspberry Pi 5 powered mini terminal - running MESH-AI & Ollama with HomeAssistant integration!
+Top case model here by oinkers1: https://www.thingiverse.com/thing:6571150
+Bottom Keyboard tray model & amazon link: available soon!
 
 ## Features
 
