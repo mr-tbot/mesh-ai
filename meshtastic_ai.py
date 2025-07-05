@@ -150,22 +150,22 @@ log.disabled = True
 BANNER = (
     "\033[38;5;214m"
     """
-███╗   ███╗███████╗███████╗██╗  ██╗████████╗ █████╗ ███████╗████████╗██╗ ██████╗               █████╗ ██╗
-████╗ ████║██╔════╝██╔════╝██║  ██║╚══██╔══╝██╔══██╗██╔════╝╚══██╔══╝██║██╔════╝              ██╔══██╗██║
-██╔████╔██║█████╗  ███████╗███████║   ██║   ███████║███████╗   ██║   ██║██║         █████╗    ███████║██║
-██║╚██╔╝██║██╔══╝  ╚════██║██╔══██║   ██║   ██╔══██║╚════██║   ██║   ██║██║         ╚════╝    ██╔══██║██║
-██║ ╚═╝ ██║███████╗███████║██║  ██║   ██║   ██║  ██║███████║   ██║   ██║╚██████╗              ██║  ██║██║
-╚═╝     ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝ ╚═════╝              ╚═╝  ╚═╝╚═╝
+███╗   ███╗███████╗███████╗██╗  ██╗             █████╗ ██╗
+████╗ ████║██╔════╝██╔════╝██║  ██║            ██╔══██╗██║
+██╔████╔██║█████╗  ███████╗███████║  █████╗    ███████║██║
+██║╚██╔╝██║██╔══╝  ╚════██║██╔══██║  ╚════╝    ██╔══██║██║
+██║ ╚═╝ ██║███████╗███████║██║  ██║            ██║  ██║██║
+╚═╝     ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝            ╚═╝  ╚═╝╚═╝
 
-Meshtastic-AI BETA v0.5.0 by: MR_TBOT (https://mr-tbot.com)
-https://github.com/mr-tbot/meshtastic-ai/
+Mesh-AI BETA v0.5.0 by: MR_TBOT (https://mr-tbot.com)
+https://github.com/mr-tbot/mesh-ai/
     \033[32m 
 Messaging Dashboard Access: http://localhost:5000/dashboard \033[38;5;214m
 """
     "\033[0m"
     "\033[31m"
     """
-DISCLAIMER: This is beta software and should not be relied upon for mission critical tasks or emergencies.
+DISCLAIMER: This is beta software - and should not be relied upon for mission critical tasks or emergencies.
 Modification of this code for nefarious purposes is strictly frowned upon. Please use responsibly.
 
 (Use at your own risk. For feedback or issues, see the GitHub link above.)
