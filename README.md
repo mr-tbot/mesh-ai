@@ -1,4 +1,4 @@
-# Mesh-AI (BETA v0.5.0) - NOW IN BETA!
+# MESH-AI (BETA v0.5.1) - NOW IN BETA!
 
 - PLEASE NOTE - MESH-AI is out of ALPHA!  There are new requirements and new config options!  Old configs should work out of the box - but please see below for changes.
 
