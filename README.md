@@ -4,7 +4,8 @@
 
 **This release is functionally the same as v0.5.0 - but has been rebranded to MESH-AI for trademark compliance and respect for the official Meshtastic.org project.  This project is getting a lot of attention now - and I am actively reaching out to the Meshtastic team for guidance on how to develop respectfully in their ecosystem - all previous ALPHA releases are going to be pulled from the repo.**
 
-![image](https://github.com/user-attachments/assets/c2a1aeab-c79a-48f6-8f4f-9835024c7881)
+![MESH-AI](https://github.com/user-attachments/assets/438dc643-6727-439d-a719-0fb905bec920)
+
 
 
 **MESH-AI** is an experimental project that bridges [Meshtastic](https://meshtastic.org/) LoRa mesh networks with powerful AI chatbots. This is the FIRST BETA RELEASE!
