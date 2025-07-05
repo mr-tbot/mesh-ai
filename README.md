@@ -1,4 +1,4 @@
-# Meshtastic-AI (BETA v0.5.0) - NOW IN BETA!
+# Mesh-AI (BETA v0.5.0) - NOW IN BETA!
 
 - PLEASE NOTE - MESH-AI is out of ALPHA!  There are new requirements and new config options!  Old configs should work out of the box - but please see below for changes.
 
@@ -6,10 +6,10 @@
 
 
 
-**Meshtastic-AI** (MESH-AI for short) is an experimental project that bridges [Meshtastic](https://meshtastic.org/) LoRa mesh networks with powerful AI chatbots. This is the FIRST BETA RELEASE!
+**Mesh-AI** is an experimental project that bridges [Meshtastic](https://meshtastic.org/) LoRa mesh networks with powerful AI chatbots. This is the FIRST BETA RELEASE!
 
 > **Disclaimer:**  
-> This project is **NOT ASSOCIATED** with the official Meshtastic Project. It is provided solely as an extension to add AI and advanced features to your Meshtastic network.  
+> This project is **NOT ASSOCIATED** with the official Meshtastic Project. It is provided solely as an extension to add AI and advanced features to your Mesh network.  
 
 > **BETA Software Warning:**  
 > This version is still in BETA. It may be unstable or incomplete. Please avoid relying on it for mission‑critical tasks or emergencies. Always have backup communication methods available and use responsibly.  
@@ -168,11 +168,11 @@
 ## Quick Start (Windows)
 
 1. **Download/Clone**  
-   - Clone the repository or copy the **meshtastic-ai** folder to your Desktop.  (Rename and remove "-main" tag from the folder name if downloading as ZIP)
+   - Clone the repository or copy the **mesh-ai** folder to your Desktop.  (Rename and remove "-main" tag from the folder name if downloading as ZIP)
 2. **Install Dependencies:**  
    - Create a virtual environment:
      ```bash
-     cd path\to\meshtastic_ai
+     cd path\to\mesh_ai
      python -m venv venv
      venv\Scripts\activate
      ```
@@ -186,7 +186,7 @@
 4. **Start the Bot:**  
    - Run the bot by double‑clicking `Run Mesh-AI - Windows.bat` or by executing:
      ```bash
-     python meshtastic_ai.py
+     python mesh_ai.py
      ```
 5. **Access the WebUI Dashboard:**  
    - Open your browser and navigate to [http://localhost:5000/dashboard](http://localhost:5000/dashboard).
@@ -196,10 +196,10 @@
 ## Quick Start (Ubuntu / Linux)
 
 1. **Download/Clone**  
-   - Clone the repository or copy the **meshtastic-ai** folder to your preferred directory:
+   - Clone the repository or copy the **mesh-ai** folder to your preferred directory:
      ```bash
-     git clone https://github.com/mr-tbot/meshtastic-ai.git
-     cd meshtastic-ai
+     git clone https://github.com/mr-tbot/mesh-ai.git
+     cd mesh-ai
      ```
 
 2. **Create and Activate a Virtual Environment Named `mesh-ai`:**  
@@ -225,7 +225,7 @@
 5. **Start the Bot:**  
    - Run the bot by executing:
      ```bash
-     python meshtastic_ai.py
+     python mesh_ai.py
      ```
 
 6. **Access the WebUI Dashboard:**  
@@ -242,7 +242,7 @@
 
 2. **Prepare the Volume Structure**  
    - In the root of your project directory:
-   - Extract the "docker-required-volumes.zip" - The included "config" & "logs" folders should be within your "meshtastic-ai folder"
+   - Extract the "docker-required-volumes.zip" - The included "config" & "logs" folders should be within your "mesh-ai folder"
    - This file structure differs from the standard release to accommodate volumes for docker
    - These files are placed in order to prevent docker from replacing these with directories on first start and throwing errors.
    - Make any changes to config files as needed before moving forward.
@@ -250,7 +250,7 @@
 File strcture should look like this:
 
    ```bash
-   meshtastic-ai/
+   mesh-ai/
    ├── config/
    │   ├── config.json
    │   ├── commands_config.json
@@ -266,7 +266,7 @@ File strcture should look like this:
    - An example docker-compose-yaml is included in the github repository - please adjust as needed.
    - From the project directory, run:
    ```bash
-   docker pull mrtbot/meshtastic-ai:latest
+   docker pull mrtbot/mesh-ai:latest
    docker-compose up -d
   
 
@@ -304,7 +304,7 @@ File strcture should look like this:
 
 ## Using the API
 
-The Meshtastic-AI server (running on Flask) exposes the following endpoints:
+The mesh-AI server (running on Flask) exposes the following endpoints:
 
 - **GET `/messages`**  
   Retrieve the last 100 messages in JSON format.
@@ -325,7 +325,7 @@ The Meshtastic-AI server (running on Flask) exposes the following endpoints:
 
 ## Configuration
 
-Your `config.json` file controls almost every aspect of Meshtastic-AI. Below is an example configuration that includes both the previous settings and the new options:
+Your `config.json` file controls almost every aspect of mesh-AI. Below is an example configuration that includes both the previous settings and the new options:
 
 ```json
 {
@@ -463,7 +463,7 @@ Your `config.json` file controls almost every aspect of Meshtastic-AI. Below is 
 - **Access the Developer Portal:**  
   Go to the [Discord Developer Portal](https://discord.com/developers/applications) and sign in with your Discord account.
 - **Create a New Application:**  
-  Click on "New Application," give it a name (e.g., *Meshtastic-AI Bot*), and confirm.
+  Click on "New Application," give it a name (e.g., *mesh-AI Bot*), and confirm.
 - **Add a Bot to Your Application:**  
   - Select your application, then navigate to the **Bot** tab on the left sidebar.  
   - Click on **"Add Bot"** and confirm by clicking **"Yes, do it!"**  
@@ -513,10 +513,10 @@ Update your configuration file with the following keys (replace placeholder text
 - **Enable Message Polling:**  
   Set `"discord_receive_enabled": true` to allow the bot to poll for new messages.
 - **Routing:**  
-  The configuration key `"discord_inbound_channel_index"` determines the channel number used by Meshtastic-AI for routing incoming Discord messages. Make sure it matches your setup.
+  The configuration key `"discord_inbound_channel_index"` determines the channel number used by mesh-AI for routing incoming Discord messages. Make sure it matches your setup.
 
 #### 6. Testing Your Discord Setup
-- **Restart Meshtastic-AI:**  
+- **Restart mesh-AI:**  
   With the updated configuration, restart your bot.
 - **Check Bot Activity:**  
   Verify that the bot is present in your server, that it can see messages in the designated channel, and that it can send responses.  
@@ -601,7 +601,7 @@ Update your configuration file with the following keys (replace placeholder text
 
 ## Conclusion
 
-Meshtastic-AI BETA v0.5.0 takes the solid foundation of v0.4.2 and introduces even more significant improvements in logging, error handling, and a bit of polish on the web-UI and it's function.  Whether you’re chatting directly with your node, integrating with Home Assistant, or leveraging multi‑channel alerting (Twilio, Email, Discord), this release offers a more comprehensive and reliable off‑grid AI assistant experience.
+mesh-AI BETA v0.5.0 takes the solid foundation of v0.4.2 and introduces even more significant improvements in logging, error handling, and a bit of polish on the web-UI and it's function.  Whether you’re chatting directly with your node, integrating with Home Assistant, or leveraging multi‑channel alerting (Twilio, Email, Discord), this release offers a more comprehensive and reliable off‑grid AI assistant experience.
 
 **Enjoy tinkering, stay safe, and have fun!**  
 Please share your feedback or join our community on GitHub.
