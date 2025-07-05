@@ -74,7 +74,7 @@
 
 ### New Updates in v0.4.1 → v0.4.2
 - **Initial Ubuntu & Ollama Unidecode Support: -**  
-  - User @milo_o - Thank you so much!  I have merged your idea into the main branch - hoping this works as expected for users - please report any problems!  -  https://github.com/mr-tbot/meshtastic-ai/discussions/19
+  - User @milo_o - Thank you so much!  I have merged your idea into the main branch - hoping this works as expected for users - please report any problems!  -  https://github.com/mr-tbot/mesh-ai/discussions/19
 - **Emergency Email Google Maps Link:**  
   - Emergency email now includes a Google Maps link to the sender's location, rather than just coordinates. - Great call, @Nlantz79!  (Remember - this is only as accurate as the sender node's location precision allows!)
 
@@ -172,7 +172,7 @@
 2. **Install Dependencies:**  
    - Create a virtual environment:
      ```bash
-     cd path\to\mesh_ai
+     cd path\to\mesh-ai
      python -m venv venv
      venv\Scripts\activate
      ```
@@ -186,7 +186,7 @@
 4. **Start the Bot:**  
    - Run the bot by double‑clicking `Run Mesh-AI - Windows.bat` or by executing:
      ```bash
-     python mesh_ai.py
+     python mesh-ai.py
      ```
 5. **Access the WebUI Dashboard:**  
    - Open your browser and navigate to [http://localhost:5000/dashboard](http://localhost:5000/dashboard).
@@ -225,7 +225,7 @@
 5. **Start the Bot:**  
    - Run the bot by executing:
      ```bash
-     python mesh_ai.py
+     python mesh-ai.py
      ```
 
 6. **Access the WebUI Dashboard:**  

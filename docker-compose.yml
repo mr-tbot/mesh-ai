@@ -1,7 +1,7 @@
 services:
-  meshtastic-ai:
-    image: mrtbot/meshtastic-ai:latest
-    container_name: meshtastic-ai
+  mesh-ai:
+    image: mrtbot/mesh-ai:latest
+    container_name: mesh-ai
     ports:
       - "5000:5000"
     privileged: true
@@ -11,14 +11,14 @@ services:
    #   - /dev/serial/by-id:/dev/serial/by-id:ro  //UNCOMMENT IF USING SERIAL.
    #   - /dev:/dev  //UNCOMMENT IF USING SERIAL.
       # Mount config files
-      - ./meshtastic-ai/config/config.json:/app/config.json
-      - ./meshtastic-ai/config/commands_config.json:/app/commands_config.json
-      - ./meshtastic-ai/config/motd.json:/app/motd.json
+      - ./mesh-ai/config/config.json:/app/config.json
+      - ./mesh-ai/config/commands_config.json:/app/commands_config.json
+      - ./mesh-ai/config/motd.json:/app/motd.json
 
       # Mount log files
-      - ./meshtastic-ai/logs/messages.log:/app/messages.log
-      - ./meshtastic-ai/logs/messages_archive.json:/app/messages_archive.json
-      - ./meshtastic-ai/logs/script.log:/app/script.log
+      - ./mesh-ai/logs/messages.log:/app/messages.log
+      - ./mesh-ai/logs/messages_archive.json:/app/messages_archive.json
+      - ./mesh-ai/logs/script.log:/app/script.log
 
     restart: unless-stopped
   #  healthcheck:  // OPTIONAL SERIAL DEVICE HEALTH CHECK - MODIFY FOR YOUR SERIAL DEVICE.
