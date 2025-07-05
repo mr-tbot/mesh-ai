@@ -7,7 +7,7 @@
 ![image](https://github.com/user-attachments/assets/c2a1aeab-c79a-48f6-8f4f-9835024c7881)
 
 
-**Mesh-AI** is an experimental project that bridges [Meshtastic](https://meshtastic.org/) LoRa mesh networks with powerful AI chatbots. This is the FIRST BETA RELEASE!
+**MESH-AI** is an experimental project that bridges [Meshtastic](https://meshtastic.org/) LoRa mesh networks with powerful AI chatbots. This is the FIRST BETA RELEASE!
 
 > **Disclaimer:**  
 > This project is **NOT ASSOCIATED** with the official Meshtastic Project. It is provided solely as an extension to add AI and advanced features to your Mesh network.  
@@ -158,7 +158,7 @@
    - **`messages.log`** for persistent logging of all incoming messages, commands, and emergencies.  
    - Distinct JSON config files: `config.json`, `commands_config.json`, and `motd.json`.  
 - **Refined Startup & Script Structure**  
-   - A new `Run Mesh-AI - Windows.bat` script for straightforward Windows startup.  
+   - A new `Run MESH-AI - Windows.bat` script for straightforward Windows startup.  
    - Added disclaimers for alpha usage throughout the code.  
    - Streamlined reconnection and exception handling logic with more robust error-handling.  
 - **General Stability & Code Quality Enhancements**  
@@ -186,7 +186,7 @@
 3. **Configure Files:**  
    - Edit `config.json`, `commands_config.json`, and `motd.json` as needed. Refer to the **Configuration** section below.
 4. **Start the Bot:**  
-   - Run the bot by double‑clicking `Run Mesh-AI - Windows.bat` or by executing:
+   - Run the bot by double‑clicking `Run MESH-AI - Windows.bat` or by executing:
      ```bash
      python mesh-ai.py
      ```
@@ -306,7 +306,7 @@ File strcture should look like this:
 
 ## Using the API
 
-The mesh-AI server (running on Flask) exposes the following endpoints:
+The MESH-AI server (running on Flask) exposes the following endpoints:
 
 - **GET `/messages`**  
   Retrieve the last 100 messages in JSON format.
@@ -327,7 +327,7 @@ The mesh-AI server (running on Flask) exposes the following endpoints:
 
 ## Configuration
 
-Your `config.json` file controls almost every aspect of mesh-AI. Below is an example configuration that includes both the previous settings and the new options:
+Your `config.json` file controls almost every aspect of MESH-AI. Below is an example configuration that includes both the previous settings and the new options:
 
 ```json
 {
@@ -465,7 +465,7 @@ Your `config.json` file controls almost every aspect of mesh-AI. Below is an exa
 - **Access the Developer Portal:**  
   Go to the [Discord Developer Portal](https://discord.com/developers/applications) and sign in with your Discord account.
 - **Create a New Application:**  
-  Click on "New Application," give it a name (e.g., *mesh-AI Bot*), and confirm.
+  Click on "New Application," give it a name (e.g., *MESH-AI Bot*), and confirm.
 - **Add a Bot to Your Application:**  
   - Select your application, then navigate to the **Bot** tab on the left sidebar.  
   - Click on **"Add Bot"** and confirm by clicking **"Yes, do it!"**  
@@ -515,10 +515,10 @@ Update your configuration file with the following keys (replace placeholder text
 - **Enable Message Polling:**  
   Set `"discord_receive_enabled": true` to allow the bot to poll for new messages.
 - **Routing:**  
-  The configuration key `"discord_inbound_channel_index"` determines the channel number used by mesh-AI for routing incoming Discord messages. Make sure it matches your setup.
+  The configuration key `"discord_inbound_channel_index"` determines the channel number used by MESH-AI for routing incoming Discord messages. Make sure it matches your setup.
 
 #### 6. Testing Your Discord Setup
-- **Restart mesh-AI:**  
+- **Restart MESH-AI:**  
   With the updated configuration, restart your bot.
 - **Check Bot Activity:**  
   Verify that the bot is present in your server, that it can see messages in the designated channel, and that it can send responses.  
@@ -603,7 +603,7 @@ Update your configuration file with the following keys (replace placeholder text
 
 ## Conclusion
 
-mesh-AI BETA v0.5.0 takes the solid foundation of v0.4.2 and introduces even more significant improvements in logging, error handling, and a bit of polish on the web-UI and it's function.  Whether you’re chatting directly with your node, integrating with Home Assistant, or leveraging multi‑channel alerting (Twilio, Email, Discord), this release offers a more comprehensive and reliable off‑grid AI assistant experience.
+MESH-AI BETA v0.5.0 takes the solid foundation of v0.4.2 and introduces even more significant improvements in logging, error handling, and a bit of polish on the web-UI and it's function.  Whether you’re chatting directly with your node, integrating with Home Assistant, or leveraging multi‑channel alerting (Twilio, Email, Discord), this release offers a more comprehensive and reliable off‑grid AI assistant experience.
 
 **Enjoy tinkering, stay safe, and have fun!**  
 Please share your feedback or join our community on GitHub.
