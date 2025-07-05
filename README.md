@@ -2,8 +2,7 @@
 
 - PLEASE NOTE - MESH-AI is out of ALPHA!  There are new requirements and new config options!  Old configs should work out of the box - but please see below for changes.
 
-![image](https://github.com/user-attachments/assets/622a3f1f-2054-456d-8357-d66ee586e39c)
-
+![image](https://github.com/user-attachments/assets/c2a1aeab-c79a-48f6-8f4f-9835024c7881)
 
 
 **Mesh-AI** is an experimental project that bridges [Meshtastic](https://meshtastic.org/) LoRa mesh networks with powerful AI chatbots. This is the FIRST BETA RELEASE!
