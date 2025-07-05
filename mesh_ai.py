@@ -157,7 +157,7 @@ BANNER = (
 ██║ ╚═╝ ██║███████╗███████║██║  ██║            ██║  ██║██║
 ╚═╝     ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝            ╚═╝  ╚═╝╚═╝
 
-Mesh-AI BETA v0.5.1 by: MR_TBOT (https://mr-tbot.com)
+MESH-AI BETA v0.5.1 by: MR_TBOT (https://mr-tbot.com)
 https://mesh-ai.dev - (https://github.com/mr-tbot/mesh-ai/)
     \033[32m 
 Messaging Dashboard Access: http://localhost:5000/dashboard \033[38;5;214m
@@ -700,7 +700,7 @@ def handle_command(cmd, full_text, sender_id):
     cmd = cmd.lower()
     dprint(f"handle_command => cmd='{cmd}', full_text='{full_text}', sender_id={sender_id}")
     if cmd == "/about":
-        return "Meshtastic-AI Off Grid Chat Bot - By: MR-TBOT.com"
+        return "MESH-AI Off Grid Chat Bot - By: MR-TBOT.com"
     elif cmd in ["/ai", "/bot", "/query", "/data"]:
         user_prompt = full_text[len(cmd):].strip()
         if AI_PROVIDER == "home_assistant" and HOME_ASSISTANT_ENABLE_PIN:
@@ -925,7 +925,7 @@ def logs():
     html = f"""<html>
   <head>
     <meta http-equiv="refresh" content="1">
-    <title>Meshtastic-AI Logs</title>
+    <title>MESH-AI Logs</title>
     <style>
       body {{ background:#000; color:#fff; font-family:monospace; padding:20px; }}
       pre {{ white-space: pre-wrap; word-break: break-word; }}
@@ -2206,7 +2206,7 @@ def main():
     server_start_time = server_start_time or datetime.now(timezone.utc)
     restart_count += 1
     add_script_log(f"Server restarted. Restart count: {restart_count}")
-    print("Starting Meshtastic-AI server...")
+    print("Starting MESH-AI server...")
     load_archive()
         # Additional startup info:
     if ENABLE_DISCORD:
