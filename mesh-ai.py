@@ -1053,7 +1053,7 @@ def dashboard():
     html = """
 <html>
 <head>
-  <title>Meshtastic AI Dashboard</title>
+  <title>MESH-AI Dashboard</title>
   <style>
     :root { --theme-color: #ffa500; }
     body { background: #000; color: #fff; font-family: Arial, sans-serif; margin: 0; padding-top: 120px; transition: filter 0.5s linear; }
