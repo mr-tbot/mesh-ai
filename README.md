@@ -71,7 +71,7 @@
   - Can be enabled by setting `"debug": true` in `config.json` to track.
 - **Updated Docker Support**  
   - Updated Docker configuration to always pull/build the latest Meshtastic-Python libraries, ensuring compatibility with Protobuf versions.
-### POSSIBLE BUGS IN BETA v0.5.0 - Web UI ticker isn't honoring read messages in some cases.
+### POSSIBLE BUGS IN BETA v0.5.1 - Web UI ticker isn't honoring read messages in some cases.
 ### INCOMING MESSAGE SOUNDS ARE UNTESTED ON ALL PLATFORMS AND FILESYSTEMS.
 
 ### New Updates in v0.4.1 → v0.4.2
@@ -603,7 +603,7 @@ Update your configuration file with the following keys (replace placeholder text
 
 ## Conclusion
 
-MESH-AI BETA v0.5.0 takes the solid foundation of v0.4.2 and introduces even more significant improvements in logging, error handling, and a bit of polish on the web-UI and it's function.  Whether you’re chatting directly with your node, integrating with Home Assistant, or leveraging multi‑channel alerting (Twilio, Email, Discord), this release offers a more comprehensive and reliable off‑grid AI assistant experience.
+MESH-AI BETA v0.5.1 takes the solid foundation of v0.4.2 and introduces even more significant improvements in logging, error handling, and a bit of polish on the web-UI and it's function.  Whether you’re chatting directly with your node, integrating with Home Assistant, or leveraging multi‑channel alerting (Twilio, Email, Discord), this release offers a more comprehensive and reliable off‑grid AI assistant experience.
 
 **Enjoy tinkering, stay safe, and have fun!**  
 Please share your feedback or join our community on GitHub.
