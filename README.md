@@ -2,6 +2,8 @@
 
 - PLEASE NOTE - MESH-AI is out of ALPHA!  There are new requirements and new config options!  Old configs should work out of the box - but please see below for changes.
 
+**This release is functionally the same as v0.5.0 - but has been rebranded to MESH-AI for trademark compliance and respect for the official Meshtastic.org project.  This project is getting a lot of attention now - and I am actively reaching out to the Meshtastic team for guidance on how to develop respectfully in their ecosystem - all previous ALPHA releases are going to be pulled from the repo.**
+
 ![image](https://github.com/user-attachments/assets/c2a1aeab-c79a-48f6-8f4f-9835024c7881)
 
 
@@ -50,7 +52,8 @@
 
 ## Changelog
 
-### New Updates in v0.4.2 → v0.5.0 - NOW IN BETA!
+### New Updates in v0.4.2 → v0.5.1 - NOW IN BETA!
+- **REBRANDED TO MESH-AI** 
 - **WebUI Enhancements**  
   - **Node Search** added for easier node management.  
   - **Channel Message Organization** with support for custom channels in `config.json`.  
