@@ -21,7 +21,7 @@
 
 ---
 
-![image](https://github.com/user-attachments/assets/bdf08934-3a80-4dc6-8a91-78e33c34db59)
+[![image](https://github.com/user-attachments/assets/bdf08934-3a80-4dc6-8a91-78e33c34db59)](https://meshtastic.org)
 The Meshtastic logo trademark is the trademark of Meshtastic LLC.
 
 
