@@ -338,7 +338,8 @@ File structure should look like this:
 
 ---
 
-![image](https://github.com/user-attachments/assets/0bc7e4a0-7eee-4b8b-b79a-38fce61e9ea8)
+<img width="3823" height="1984" alt="image" src="https://github.com/user-attachments/assets/42a523a8-677d-4931-84c0-c166743bca86" />
+
 
 
 
