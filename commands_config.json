@@ -2,15 +2,18 @@
   "commands": [
     {
       "command": "/ping",
-      "response": "Pong!"
+      "response": "Pong!",
+      "description": "Health check: replies with Pong!"
     },
     {
       "command": "/weather",
-      "response": "Currently, local weather is unknown. (This is a placeholder.)"
+      "response": "Currently, local weather is unknown. (This is a placeholder.)",
+      "description": "Show placeholder local weather (demo)"
     },
 	{
 	  "command": "/funfact",
-      "ai_prompt": "Give me a fun fact about {user_input}"
+      "ai_prompt": "Give me a fun fact about {user_input}",
+      "description": "Ask the AI for a fun fact about your topic"
     }
   ]
 }

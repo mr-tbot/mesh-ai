@@ -6,6 +6,7 @@ import json
 import requests
 import time
 from datetime import datetime, timedelta, timezone  # Added timezone import
+import time
 import threading
 import os
 import smtplib
@@ -19,12 +20,18 @@ import re
 from twilio.rest import Client  # for Twilio SMS support
 from unidecode import unidecode   # Added unidecode import for Ollama text normalization
 from google.protobuf.message import DecodeError
+import re
 # Make sure DEBUG_ENABLED exists before any logger/filter classes use it
 # -----------------------------
 # Global Debug & Noise Patterns
 # -----------------------------
 # Debug flag loaded later from config.json
 DEBUG_ENABLED = False
+# Unique AI marker used to identify AI-originated messages (NOT configurable by design)
+# Keep this at 3 characters max to minimize payload overhead.
+AI_PREFIX_TAG = "m@i- "
+# Track nodes that appear to be AI (sent messages starting with AI_PREFIX_TAG)
+AI_NODE_IDS = set()
 # Suppress these protobuf messages unless DEBUG_ENABLED=True
 NOISE_PATTERNS = (
     "Error while parsing FromRadio",
@@ -55,11 +62,8 @@ def dprint(*args, **kwargs):
         print(*args, **kwargs)
 
 def info_print(*args, **kwargs):
-    if not DEBUG_ENABLED:
-        print(*args, **kwargs)
-
-if DEBUG_ENABLED:
-    print(f"DEBUG: Loaded main config => {config}")
+  if not DEBUG_ENABLED:
+    print(*args, **kwargs)
 # -----------------------------
 # Verbose Logging Setup
 # -----------------------------
@@ -157,7 +161,7 @@ BANNER = (
 ██║ ╚═╝ ██║███████╗███████║██║  ██║            ██║  ██║██║
 ╚═╝     ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝            ╚═╝  ╚═╝╚═╝
 
-MESH-AI BETA v0.5.1 by: MR_TBOT (https://mr-tbot.com)
+MESH-AI BETA v0.6.0 (PRE-RELEASE 1) by: MR_TBOT (https://mr-tbot.com)
 https://mesh-ai.dev - (https://github.com/mr-tbot/mesh-ai/)
     \033[32m 
 Messaging Dashboard Access: http://localhost:5000/dashboard \033[38;5;214m
@@ -207,6 +211,9 @@ except FileNotFoundError:
     motd_content = "No MOTD available."
 
 
+# Config Editor endpoints are defined after app initialization below
+
+
 
 # -----------------------------
 # AI Provider & Other Config Vars
@@ -230,6 +237,9 @@ OPENAI_TIMEOUT = config.get("openai_timeout", 30)
 OLLAMA_URL = config.get("ollama_url", "http://localhost:11434/api/generate")
 OLLAMA_MODEL = config.get("ollama_model", "llama2")
 OLLAMA_TIMEOUT = config.get("ollama_timeout", 60)
+# Optional advanced Ollama settings to improve stability/quality
+OLLAMA_OPTIONS = config.get("ollama_options", {})  # e.g., {"temperature": 0.7}
+OLLAMA_KEEP_ALIVE = config.get("ollama_keep_alive", "10m")  # keep model loaded
 HOME_ASSISTANT_URL = config.get("home_assistant_url", "")
 HOME_ASSISTANT_TOKEN = config.get("home_assistant_token", "")
 HOME_ASSISTANT_TIMEOUT = config.get("home_assistant_timeout", 30)
@@ -279,9 +289,65 @@ WIFI_HOST = config.get("wifi_host", None)
 WIFI_PORT = int(config.get("wifi_port", 4403))
 USE_MESH_INTERFACE = bool(config.get("use_mesh_interface", False))
 
+# Safeguards and network behavior toggles
+# - ai_respond_on_longfast: if False (default), the bot will NOT reply on channel 0 (LongFast)
+# - respond_to_mqtt_messages: if False (default), the bot will ignore messages received via MQTT
+AI_RESPOND_ON_LONGFAST = bool(config.get("ai_respond_on_longfast", False))
+RESPOND_TO_MQTT_MESSAGES = bool(config.get("respond_to_mqtt_messages", False))
+
+# Randomized, per-install AI command alias. Generated on first run to reduce collisions
+def _ensure_ai_command_alias():
+  alias = config.get("ai_command")
+  # Enforce a randomized alias; do not allow bare "/ai" as a default
+  if isinstance(alias, str) and alias.startswith("/") and len(alias) <= 12:
+    # Disallow bare "/ai" and "/ai-"
+    if alias.lower() not in ("/ai", "/ai-"):
+      return alias
+  import random, string
+  # Build a short alias like /ai-x7 or /ai5k
+  suffix = "".join(random.choices(string.ascii_lowercase + string.digits, k=2))
+  alias = f"/ai-{suffix}"
+  config["ai_command"] = alias
+  try:
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+      json.dump(config, f, ensure_ascii=False, indent=2)
+    print(f"Generated randomized AI command alias: {alias} (saved to {CONFIG_FILE})")
+  except Exception as e:
+    print(f"⚠️ Could not persist ai_command alias to {CONFIG_FILE}: {e}")
+  return alias
+
+AI_COMMAND_ALIAS = _ensure_ai_command_alias()
+
+# Derive unique suffix from the alias
+# Support both old style ("/ai9z") and new dashed style ("/ai-9z") for parsing
+_m = re.match(r"^(?:/ai-([a-z0-9]+)|/ai([a-z0-9]+))$", AI_COMMAND_ALIAS or "", re.IGNORECASE)
+AI_SUFFIX = (_m.group(1) or _m.group(2)) if _m else ""
+
+# Canonical, dashed AI alias for display (always shows as /ai-xx)
+AI_ALIAS_CANONICAL = f"/ai-{AI_SUFFIX}" if AI_SUFFIX else AI_COMMAND_ALIAS
+
+# Only dashed suffixed commands are allowed (no bare defaults)
+AI_COMMANDS = [
+  f"/ai-{AI_SUFFIX}",
+  f"/bot-{AI_SUFFIX}",
+  f"/query-{AI_SUFFIX}",
+  f"/data-{AI_SUFFIX}",
+]
+
+# SMS also requires the unique dashed suffix
+SMS_COMMAND = f"/sms-{AI_SUFFIX}"
+
+# Other built-ins that must also use the unique dashed suffix
+ABOUT_COMMAND = f"/about-{AI_SUFFIX}"
+WHEREAMI_COMMAND = f"/whereami-{AI_SUFFIX}"
+TEST_COMMAND = None  # /test remains unsuffixed by request
+HELP_COMMAND = f"/help-{AI_SUFFIX}"
+MOTD_COMMAND = f"/motd-{AI_SUFFIX}"
+
 app = Flask(__name__)
 messages = []
 interface = None
+STARTUP_INFO_PRINTED = False  # guard to avoid duplicate startup prints
 
 lastDMNode = None
 lastChannelIndex = None
@@ -297,6 +363,47 @@ def get_node_location(node_id):
         tstamp = pos.get("time")
         return lat, lon, tstamp
     return None, None, None
+
+# -----------------------------
+# Config Editor Endpoints (after app creation)
+# -----------------------------
+@app.route("/config_editor/load", methods=["GET"])
+def config_editor_load():
+  try:
+    cfg = safe_load_json(CONFIG_FILE, {})
+    cmds = safe_load_json(COMMANDS_CONFIG_FILE, {"commands": []})
+    try:
+      with open(MOTD_FILE, "r", encoding="utf-8") as f:
+        motd = f.read()
+    except FileNotFoundError:
+      motd = ""
+    return jsonify({"config": cfg, "commands_config": cmds, "motd": motd})
+  except Exception as e:
+    return jsonify({"message": str(e)}), 500
+
+@app.route("/config_editor/save", methods=["POST"])
+def config_editor_save():
+  try:
+    data = request.get_json(force=True) or {}
+    cfg = data.get("config", {})
+    cmds = data.get("commands_config", {})
+    motd = data.get("motd", "")
+    if not isinstance(cfg, dict):
+      return jsonify({"message": "config must be a JSON object"}), 400
+    if not isinstance(cmds, dict):
+      return jsonify({"message": "commands_config must be a JSON object"}), 400
+    for path, obj in ((CONFIG_FILE, cfg), (COMMANDS_CONFIG_FILE, cmds)):
+      tmp = path + ".tmp"
+      with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(obj, f, ensure_ascii=False, indent=2)
+      os.replace(tmp, path)
+    tmpm = MOTD_FILE + ".tmp"
+    with open(tmpm, "w", encoding="utf-8") as f:
+      f.write(motd)
+    os.replace(tmpm, MOTD_FILE)
+    return jsonify({"status": "ok"})
+  except Exception as e:
+    return jsonify({"message": str(e)}), 500
 
 def load_archive():
     global messages
@@ -386,6 +493,51 @@ def split_message(text):
         return []
     return [text[i: i + MAX_CHUNK_SIZE] for i in range(0, len(text), MAX_CHUNK_SIZE)][:MAX_CHUNKS]
 
+def add_ai_prefix(text: str) -> str:
+  """Prefix AI marker if not already present."""
+  t = (text or "").lstrip()
+  if t.startswith(AI_PREFIX_TAG):
+    return text
+  # Tag already includes trailing hyphen and space
+  return f"{AI_PREFIX_TAG}{text}" if text else text
+
+def sanitize_model_output(text: str) -> str:
+  """Remove any 'thinking' style tags/blocks and normalize output for mesh.
+
+  Strips XML-like think tags, fenced blocks labeled as thinking/analysis/etc.,
+  bracketed/parenthesized meta notes, YAML/JSON-style reasoning fields, and
+  common heading lines like "Thought:". Also normalizes to printable ASCII
+  and collapses whitespace.
+  """
+  if not text:
+    return ""
+  s = str(text)
+  try:
+    # XML-like think blocks
+    s = re.sub(r"<(?:think|thought|chain[ _\s-]*of[ _\s-]*thought)[^>]*>.*?</(?:think|thought|chain[ _\s-]*of[ _\s-]*thought)>", "", s, flags=re.IGNORECASE | re.DOTALL)
+    # Fenced blocks labeled as thinking/meta
+    s = re.sub(r"```[ \t]*(?:thinking|analysis|reasoning|plan|thoughts?|cot|chain[ _\s-]*of[ _\s-]*thought|inner(?:\s|-)?monologue|reflection|critique)\b[\s\S]*?```", "", s, flags=re.IGNORECASE)
+    # Inline meta markers
+    s = re.sub(r"\[(?:\s*(?:think|thinking|thoughts?|reasoning|analysis|plan|critique|reflection)[^\]]*)\]", "", s, flags=re.IGNORECASE)
+    s = re.sub(r"\((?:\s*(?:think|thinking|thoughts?|reasoning|analysis|plan|critique|reflection)[^\)]*)\)", "", s, flags=re.IGNORECASE)
+    # Fullwidth bracket meta
+    s = re.sub(r"【[^】]*】", "", s)
+    # Heading lines like "Thought:", "Reasoning:", etc.
+    s = re.sub(r"(?mi)^\s*(?:Thoughts?|Thinking|Reasoning|Analysis|Reflection|Critique|Self-critique|Chain\s*of\s*Thought|COT|Inner\s*Monologue|Plan|System|Tool|Action|Observation)\s*:\s*.*$\n?", "", s)
+    # YAML-like sections (reasoning: | then indented lines)
+    s = re.sub(r"(?mis)^\s*(?:reasoning|analysis|thoughts?|plan|critique|inner[ _-]?monologue|chain[ _-]?of[ _-]?thought|cot)\s*:\s*(?:\|\s*)?(?:\n(?:\s{2,}.+))*", "", s)
+    # [BEGIN REASONING] ... [END REASONING]
+    s = re.sub(r"\[\s*BEGIN[^\]]*(?:REASONING|THINKING|ANALYSIS)[^\]]*\][\s\S]*?\[\s*END[^\]]*\]", "", s, flags=re.IGNORECASE)
+    # JSON-like meta fields
+    s = re.sub(r"\"(?:reasoning|analysis|thoughts?|plan|critique|inner[_\s-]?monologue)\"\s*:\s*\"(?:\\\"|[^\"])*\"\s*,?", "", s, flags=re.IGNORECASE)
+    # Normalize and collapse
+    s = unidecode(s)
+    s = ''.join(ch for ch in s if ch.isprintable())
+    s = ' '.join(s.split())
+    return s
+  except Exception:
+    return s
+
 def send_broadcast_chunks(interface, text, channelIndex):
     dprint(f"send_broadcast_chunks: text='{text}', channelIndex={channelIndex}")
     info_print(f"[Info] Sending broadcast on channel {channelIndex} → '{text}'")
@@ -454,9 +606,10 @@ def send_to_lmstudio(user_message: str):
             dprint(f"LMStudio raw ⇒ {j}")
             ai_resp = (
                 j.get("choices", [{}])[0]
-                 .get("message", {})
-                 .get("content", "🤖 [No response]")
+                  .get("message", {})
+                  .get("content", "🤖 [No response]")
             )
+            ai_resp = sanitize_model_output(ai_resp)
             return ai_resp[:MAX_RESPONSE_LENGTH]
         else:
             print(f"⚠️ LMStudio error: {response.status_code} - {response.text}")
@@ -515,6 +668,7 @@ def send_to_openai(user_message):
                   .get("message", {})
                   .get("content", "🤖 [No response]")
             )
+            content = sanitize_model_output(content)
             return content[:MAX_RESPONSE_LENGTH]
         else:
             print(f"⚠️ OpenAI error: {r.status_code} => {r.text}")
@@ -532,20 +686,38 @@ def send_to_ollama(user_message):
     payload = {
         "prompt": combined_prompt,
         "model": OLLAMA_MODEL,
-        "stream": False  # Added to disable streaming responses
+        "stream": False,  # Disable streaming responses for simpler parsing
+        "keep_alive": OLLAMA_KEEP_ALIVE,
+        "options": OLLAMA_OPTIONS,
     }
-    try:
-        r = requests.post(OLLAMA_URL, json=payload, timeout=OLLAMA_TIMEOUT)
-        if r.status_code == 200:
-            jr = r.json()
-            dprint(f"Ollama raw => {jr}")
-            return jr.get("response", "🤖 [No response]")[:MAX_RESPONSE_LENGTH]
-        else:
-            print(f"⚠️ Ollama error: {r.status_code} => {r.text}")
-            return None
-    except Exception as e:
-        print(f"⚠️ Ollama request failed: {e}")
-        return None
+
+    # Simple retry for transient failures
+    def _sanitize(text: str) -> str:
+        try:
+            t = text or ""
+            # Normalize weird unicode and strip control chars
+            t = unidecode(t)
+            t = ''.join(ch for ch in t if ch.isprintable())
+            # Collapse excessive whitespace
+            return ' '.join(t.split())
+        except Exception:
+            return text or ""
+
+    for attempt in range(2):  # up to 2 attempts
+        try:
+            r = requests.post(OLLAMA_URL, json=payload, timeout=OLLAMA_TIMEOUT)
+            if r.status_code == 200:
+                jr = r.json()
+                dprint(f"Ollama raw => {jr}")
+                resp = jr.get("response", "")
+                clean = sanitize_model_output(_sanitize(resp))
+                return (clean if clean else "🤖 [No response]")[:MAX_RESPONSE_LENGTH]
+            else:
+                print(f"⚠️ Ollama error: {r.status_code} => {r.text}")
+        except Exception as e:
+            print(f"⚠️ Ollama request failed (attempt {attempt+1}): {e}")
+        time.sleep(0.5 * (attempt + 1))
+    return None
 
 def send_to_home_assistant(user_message):
     dprint(f"send_to_home_assistant: user_message='{user_message}'")
@@ -564,6 +736,7 @@ def send_to_home_assistant(user_message):
             speech = data.get("response", {}).get("speech", {})
             answer = speech.get("plain", {}).get("speech")
             if answer:
+                answer = sanitize_model_output(answer)
                 return answer[:MAX_RESPONSE_LENGTH]
             return "🤖 [No response from Home Assistant]"
         else:
@@ -697,164 +870,271 @@ def route_message_text(user_message, channel_idx):
 # Revised Command Handler (Case-Insensitive)
 # -----------------------------
 def handle_command(cmd, full_text, sender_id):
-    cmd = cmd.lower()
-    dprint(f"handle_command => cmd='{cmd}', full_text='{full_text}', sender_id={sender_id}")
-    if cmd == "/about":
-        return "MESH-AI Off Grid Chat Bot - By: MR-TBOT.com"
-    elif cmd in ["/ai", "/bot", "/query", "/data"]:
-        user_prompt = full_text[len(cmd):].strip()
+  cmd = cmd.lower()
+  dprint(f"handle_command => cmd='{cmd}', full_text='{full_text}', sender_id={sender_id}")
+  if cmd == ABOUT_COMMAND:
+    return "MESH-AI Off Grid Chat Bot - By: MR-TBOT.com"
+  elif cmd in AI_COMMANDS:
+    user_prompt = full_text[len(cmd):].strip()
+    if AI_PROVIDER == "home_assistant" and HOME_ASSISTANT_ENABLE_PIN:
+      if not pin_is_valid(user_prompt):
+        return "Security code missing or invalid. Use 'PIN=XXXX'"
+      user_prompt = strip_pin(user_prompt)
+    ai_answer = get_ai_response(user_prompt)
+    return ai_answer if ai_answer else "🤖 [No AI response]"
+  elif cmd == WHEREAMI_COMMAND:
+    lat, lon, tstamp = get_node_location(sender_id)
+    sn = get_node_shortname(sender_id)
+    if lat is None or lon is None:
+      return f"🤖 Sorry {sn}, I have no GPS fix for your node."
+    tstr = str(tstamp) if tstamp else "Unknown"
+    return f"Node {sn} GPS: {lat}, {lon} (time: {tstr})"
+  elif cmd in ["/emergency", "/911"]:
+    lat, lon, tstamp = get_node_location(sender_id)
+    user_msg = full_text[len(cmd):].strip()
+    send_emergency_notification(sender_id, user_msg, lat, lon, tstamp)
+    log_message(sender_id, f"EMERGENCY TRIGGERED: {full_text}", is_emergency=True)
+    return "🚨 Emergency alert sent. Stay safe."
+  elif cmd == "/ping":
+    return "pong"
+  elif cmd == "/test":
+    sn = get_node_shortname(sender_id)
+    return f"Hello {sn}! Received {LOCAL_LOCATION_STRING} by {AI_NODE_NAME}."
+  elif cmd == HELP_COMMAND:
+    # Show only suffixed commands to avoid collisions (except emergency/911)
+    built_in = [
+      ABOUT_COMMAND,
+      WHEREAMI_COMMAND,
+      "/emergency",
+      "/911",
+      "/ping",
+      "/test",
+      MOTD_COMMAND,
+    ] + AI_COMMANDS + [SMS_COMMAND]
+    custom_cmds = [c.get("command") for c in commands_config.get("commands", [])]
+    return "Commands:\n" + ", ".join(built_in + custom_cmds)
+  elif cmd == MOTD_COMMAND:
+    return motd_content
+  elif cmd == SMS_COMMAND:
+    parts = full_text.split(" ", 2)
+    if len(parts) < 3:
+      return f"Invalid syntax. Use: {SMS_COMMAND} <phone_number> <message>"
+    phone_number = parts[1]
+    message_text = parts[2]
+    try:
+      client = Client(TWILIO_SID, TWILIO_AUTH_TOKEN)
+      client.messages.create(
+        body=message_text,
+        from_=TWILIO_FROM_NUMBER,
+        to=phone_number
+      )
+      print(f"✅ SMS sent to {phone_number}")
+      return "SMS sent successfully."
+    except Exception as e:
+      print(f"⚠️ Failed to send SMS: {e}")
+      return "Failed to send SMS."
+  for c in commands_config.get("commands", []):
+    if c.get("command").lower() == cmd:
+      if "ai_prompt" in c:
+        user_input = full_text[len(cmd):].strip()
+        custom_text = c["ai_prompt"].replace("{user_input}", user_input)
         if AI_PROVIDER == "home_assistant" and HOME_ASSISTANT_ENABLE_PIN:
-            if not pin_is_valid(user_prompt):
-                return "Security code missing or invalid. Use 'PIN=XXXX'"
-            user_prompt = strip_pin(user_prompt)
-        ai_answer = get_ai_response(user_prompt)
-        return ai_answer if ai_answer else "🤖 [No AI response]"
-    elif cmd == "/whereami":
-        lat, lon, tstamp = get_node_location(sender_id)
-        sn = get_node_shortname(sender_id)
-        if lat is None or lon is None:
-            return f"🤖 Sorry {sn}, I have no GPS fix for your node."
-        tstr = str(tstamp) if tstamp else "Unknown"
-        return f"Node {sn} GPS: {lat}, {lon} (time: {tstr})"
-    elif cmd in ["/emergency", "/911"]:
-        lat, lon, tstamp = get_node_location(sender_id)
-        user_msg = full_text[len(cmd):].strip()
-        send_emergency_notification(sender_id, user_msg, lat, lon, tstamp)
-        log_message(sender_id, f"EMERGENCY TRIGGERED: {full_text}", is_emergency=True)
-        return "🚨 Emergency alert sent. Stay safe."
-    elif cmd == "/test":
-        sn = get_node_shortname(sender_id)
-        return f"Hello {sn}! Received {LOCAL_LOCATION_STRING} by {AI_NODE_NAME}."
-    elif cmd == "/help":
-        built_in = ["/about", "/query", "/whereami", "/emergency", "/911", "/test", "/motd"]
-        custom_cmds = [c.get("command") for c in commands_config.get("commands",[])]
-        return "Commands:\n" + ", ".join(built_in + custom_cmds)
-    elif cmd == "/motd":
-        return motd_content
-    elif cmd == "/sms":
-        parts = full_text.split(" ", 2)
-        if len(parts) < 3:
-            return "Invalid syntax. Use: /sms <phone_number> <message>"
-        phone_number = parts[1]
-        message_text = parts[2]
-        try:
-            client = Client(TWILIO_SID, TWILIO_AUTH_TOKEN)
-            client.messages.create(
-                body=message_text,
-                from_=TWILIO_FROM_NUMBER,
-                to=phone_number
-            )
-            print(f"✅ SMS sent to {phone_number}")
-            return "SMS sent successfully."
-        except Exception as e:
-            print(f"⚠️ Failed to send SMS: {e}")
-            return "Failed to send SMS."
-    for c in commands_config.get("commands", []):
-        if c.get("command").lower() == cmd:
-            if "ai_prompt" in c:
-                user_input = full_text[len(cmd):].strip()
-                custom_text = c["ai_prompt"].replace("{user_input}", user_input)
-                if AI_PROVIDER == "home_assistant" and HOME_ASSISTANT_ENABLE_PIN:
-                    if not pin_is_valid(custom_text):
-                        return "Security code missing or invalid."
-                    custom_text = strip_pin(custom_text)
-                ans = get_ai_response(custom_text)
-                return ans if ans else "🤖 [No AI response]"
-            elif "response" in c:
-                return c["response"]
-            return "No configured response for this command."
-    return None
+          if not pin_is_valid(custom_text):
+            return "Security code missing or invalid."
+          custom_text = strip_pin(custom_text)
+        ans = get_ai_response(custom_text)
+        return ans if ans else "🤖 [No AI response]"
+      elif "response" in c:
+        return c["response"]
+      return "No configured response for this command."
+  return None
+
+# -----------------------------
+# Commands inventory helpers (for /help, /commands page, and startup logs)
+# -----------------------------
+def get_available_commands_list():
+  """Return a list of (command, description) for built-ins, AI, SMS, and custom commands."""
+  desc = {}
+  # Built-ins
+  desc[ABOUT_COMMAND] = "About this bot"
+  desc[WHEREAMI_COMMAND] = "Show your node's GPS coordinates (if available)"
+  desc[MOTD_COMMAND] = "Show the Message of the Day"
+  desc[HELP_COMMAND] = "List available commands"
+  desc["/emergency"] = "Send an emergency alert (Twilio/Email/Discord if enabled)"
+  desc["/911"] = "Alias for /emergency"
+  desc["/ping"] = "Health check (returns 'pong')"
+  desc["/test"] = "Test greeting"
+  # AI
+  for c in AI_COMMANDS:
+    desc[c] = "Ask the AI (requires your unique dashed suffix)"
+  # SMS
+  desc[SMS_COMMAND] = "Send an SMS: /sms-XY <+15555555555> <message>"
+  # Custom commands
+  for c in commands_config.get("commands", []):
+    cmd = c.get("command")
+    if not cmd:
+      continue
+    if c.get("description"):
+      d = c["description"]
+    elif c.get("ai_prompt"):
+      d = "Custom AI command"
+    elif c.get("response"):
+      d = "Custom canned response"
+    else:
+      d = "Custom command"
+    desc[cmd] = d
+  # Return stable ordering: group by category similar to /help
+  built_in = [
+    ABOUT_COMMAND,
+    WHEREAMI_COMMAND,
+    "/emergency",
+    "/911",
+    "/ping",
+    "/test",
+    MOTD_COMMAND,
+  ]
+  all_cmds = []
+  for c in built_in:
+    if c in desc:
+      all_cmds.append((c, desc[c]))
+  for c in AI_COMMANDS:
+    all_cmds.append((c, desc[c]))
+  all_cmds.append((SMS_COMMAND, desc[SMS_COMMAND]))
+  # Append custom at the end sorted by name
+  custom_items = [(k, v) for k, v in desc.items() if k not in {x for x, _ in all_cmds} and k.startswith("/")]
+  for k, v in sorted(custom_items, key=lambda kv: kv[0].lower()):
+    all_cmds.append((k, v))
+  return all_cmds
+
+def get_available_commands_text():
+  """One-line string of commands for logs/terminal."""
+  return ", ".join(cmd for cmd, _ in get_available_commands_list())
 
 def parse_incoming_text(text, sender_id, is_direct, channel_idx):
-    dprint(f"parse_incoming_text => text='{text}' is_direct={is_direct} channel={channel_idx}")
-    info_print(f"[Info] Received from node {sender_id} (direct={is_direct}, ch={channel_idx}) => '{text}'")
-    text = text.strip()
-    if not text:
-        return None
-    if is_direct and not config.get("reply_in_directs", True):
-        return None
-    if (not is_direct) and channel_idx != HOME_ASSISTANT_CHANNEL_INDEX and not config.get("reply_in_channels", True):
-        return None
-    if text.startswith("/"):
-        cmd = text.split()[0]
-        resp = handle_command(cmd, text, sender_id)
-        return resp
-    if is_direct:
-        return get_ai_response(text)
-    if HOME_ASSISTANT_ENABLED and channel_idx == HOME_ASSISTANT_CHANNEL_INDEX:
-        return route_message_text(text, channel_idx)
+  dprint(f"parse_incoming_text => text='{text}' is_direct={is_direct} channel={channel_idx}")
+  info_print(f"[Info] Received from node {sender_id} (direct={is_direct}, ch={channel_idx}) => '{text}'")
+  text = text.strip()
+  if not text:
     return None
+  # Ignore messages that look like they came from an AI node
+  if text.startswith(AI_PREFIX_TAG):
+    AI_NODE_IDS.add(sender_id)
+    dprint(f"Ignoring AI-tagged message from {sender_id}.")
+    return None
+  # If we've previously seen this sender use the AI tag, don't respond to any of its messages
+  if sender_id in AI_NODE_IDS:
+    dprint(f"Ignoring message from known AI node {sender_id}.")
+    return None
+  if is_direct and not config.get("reply_in_directs", True):
+    return None
+  if (not is_direct) and channel_idx != HOME_ASSISTANT_CHANNEL_INDEX and not config.get("reply_in_channels", True):
+    return None
+  if text.startswith("/"):
+    cmd = text.split()[0]
+    resp = handle_command(cmd, text, sender_id)
+    return resp
+  if is_direct:
+    return get_ai_response(text)
+  if HOME_ASSISTANT_ENABLED and channel_idx == HOME_ASSISTANT_CHANNEL_INDEX:
+    return route_message_text(text, channel_idx)
+  return None
 
 def on_receive(packet=None, interface=None, **kwargs):
-    dprint(f"on_receive => packet={packet}")
-    if not packet or 'decoded' not in packet:
-        dprint("No decoded packet => ignoring.")
-        return
-    if packet['decoded']['portnum'] != 'TEXT_MESSAGE_APP':
-        dprint("Not TEXT_MESSAGE_APP => ignoring.")
-        return
-    try:
-        text_raw = packet['decoded']['payload']
-        text = text_raw.decode('utf-8', errors='replace')
-        sender_node = packet.get('fromId', None)
-        raw_to = packet.get('toId', None)
-        to_node_int = parse_node_id(raw_to)
-        ch_idx = packet.get('channel', 0)
-        dprint(f"[MSG] from {sender_node} to {raw_to} (ch={ch_idx}): {text}")
-        entry = log_message(sender_node, text, direct=(to_node_int != BROADCAST_ADDR), channel_idx=(None if to_node_int != BROADCAST_ADDR else ch_idx))
-        global lastDMNode, lastChannelIndex
-        if to_node_int != BROADCAST_ADDR:
-            lastDMNode = sender_node
-        else:
-            lastChannelIndex = ch_idx
+  dprint(f"on_receive => packet={packet}")
+  if not packet or 'decoded' not in packet:
+    dprint("No decoded packet => ignoring.")
+    return
+  if packet['decoded']['portnum'] != 'TEXT_MESSAGE_APP':
+    dprint("Not TEXT_MESSAGE_APP => ignoring.")
+    return
+  try:
+    text_raw = packet['decoded']['payload']
+    text = text_raw.decode('utf-8', errors='replace')
+    sender_node = packet.get('fromId', None)
+    raw_to = packet.get('toId', None)
+    to_node_int = parse_node_id(raw_to)
+    ch_idx = packet.get('channel', 0)
 
-        # Only forward messages on the configured Discord inbound channel to Discord.
-        if ENABLE_DISCORD and DISCORD_SEND_ALL and DISCORD_INBOUND_CHANNEL_INDEX is not None and ch_idx == DISCORD_INBOUND_CHANNEL_INDEX:
-            sender_info = f"{get_node_shortname(sender_node)} ({sender_node})"
-            disc_content = f"**{sender_info}**: {text}"
-            send_discord_message(disc_content)
+    # MQTT gating: ignore MQTT-originated traffic if configured to do so
+    via_mqtt = bool(packet.get('viaMqtt') or packet.get('rxViaMqtt') or packet.get('decoded', {}).get('viaMqtt'))
+    if via_mqtt and not RESPOND_TO_MQTT_MESSAGES:
+      dprint("Message received via MQTT; RESPOND_TO_MQTT_MESSAGES is False. Ignoring.")
+      # Still log the message for visibility
+      log_message(sender_node, text, direct=(to_node_int != BROADCAST_ADDR), channel_idx=(None if to_node_int != BROADCAST_ADDR else ch_idx))
+      return
 
-        my_node_num = None
-        if FORCE_NODE_NUM is not None:
-            my_node_num = FORCE_NODE_NUM
-        else:
-            if hasattr(interface, "myNode") and interface.myNode:
-                my_node_num = interface.myNode.nodeNum
-            elif hasattr(interface, "localNode") and interface.localNode:
-                my_node_num = interface.localNode.nodeNum
-        is_direct = False
-        if to_node_int == BROADCAST_ADDR:
-            is_direct = False
-        elif my_node_num is not None and to_node_int == my_node_num:
-            is_direct = True
-        else:
-            is_direct = (my_node_num == to_node_int)
-        resp = parse_incoming_text(text, sender_node, is_direct, ch_idx)
-        if resp:
-            info_print("[Info] Wait 10s before responding to reduce collisions.")
-            time.sleep(10)
-            log_message(AI_NODE_NAME, resp, reply_to=entry['timestamp'])
-            # If message originated on Discord inbound channel, also send the AI response back to Discord.
-            if ENABLE_DISCORD and DISCORD_SEND_AI and DISCORD_INBOUND_CHANNEL_INDEX is not None and ch_idx == DISCORD_INBOUND_CHANNEL_INDEX:
-                disc_msg = f"🤖 **{AI_NODE_NAME}**: {resp}"
-                send_discord_message(disc_msg)
-            if is_direct:
-                send_direct_chunks(interface, resp, sender_node)
-            else:
-                send_broadcast_chunks(interface, resp, ch_idx)
-    except OSError as e:
-        error_code = getattr(e, 'errno', None) or getattr(e, 'winerror', None)
-        print(f"⚠️ OSError detected in on_receive: {e} (error code: {error_code})")
-        if error_code in (10053, 10054, 10060):
-            print("⚠️ Connection error detected. Restarting interface...")
-            global connection_status
-            connection_status = "Disconnected"
-            reset_event.set()
-        # Instead of re-raising, simply return to prevent thread crash
-        return
-    except Exception as e:
-        print(f"⚠️ Unexpected error in on_receive: {e}")
-        return
+    dprint(f"[MSG] from {sender_node} to {raw_to} (ch={ch_idx}): {text}")
+    entry = log_message(sender_node, text, direct=(to_node_int != BROADCAST_ADDR), channel_idx=(None if to_node_int != BROADCAST_ADDR else ch_idx))
+
+    global lastDMNode, lastChannelIndex
+    if to_node_int != BROADCAST_ADDR:
+      lastDMNode = sender_node
+    else:
+      lastChannelIndex = ch_idx
+
+    # Only forward messages on the configured Discord inbound channel to Discord.
+    if ENABLE_DISCORD and DISCORD_SEND_ALL and DISCORD_INBOUND_CHANNEL_INDEX is not None and ch_idx == DISCORD_INBOUND_CHANNEL_INDEX:
+      sender_info = f"{get_node_shortname(sender_node)} ({sender_node})"
+      disc_content = f"**{sender_info}**: {text}"
+      send_discord_message(disc_content)
+
+    my_node_num = None
+    if FORCE_NODE_NUM is not None:
+      my_node_num = FORCE_NODE_NUM
+    else:
+      if hasattr(interface, "myNode") and interface.myNode:
+        my_node_num = interface.myNode.nodeNum
+      elif hasattr(interface, "localNode") and interface.localNode:
+        my_node_num = interface.localNode.nodeNum
+
+    if to_node_int == BROADCAST_ADDR:
+      is_direct = False
+    elif my_node_num is not None and to_node_int == my_node_num:
+      is_direct = True
+    else:
+      is_direct = (my_node_num == to_node_int)
+
+    # LongFast gating: do not respond on channel 0 unless explicitly enabled
+    if (not is_direct) and ch_idx == 0 and not AI_RESPOND_ON_LONGFAST:
+      dprint("AI_RESPOND_ON_LONGFAST=False; not responding on LongFast (ch 0).")
+      return
+
+    # Ignore AI-tagged messages and known AI nodes before parsing
+    if text.strip().startswith(AI_PREFIX_TAG):
+      AI_NODE_IDS.add(sender_node)
+      dprint("Inbound message is AI-tagged; skipping response.")
+      return
+    if sender_node in AI_NODE_IDS:
+      dprint("Sender is a known AI node; skipping response.")
+      return
+
+    resp = parse_incoming_text(text, sender_node, is_direct, ch_idx)
+    if resp:
+      info_print("[Info] Wait 10s before responding to reduce collisions.")
+      time.sleep(10)
+      ai_out = add_ai_prefix(resp)
+      log_message(AI_NODE_NAME, ai_out, reply_to=entry['timestamp'])
+      # If message originated on Discord inbound channel, also send the AI response back to Discord.
+      if ENABLE_DISCORD and DISCORD_SEND_AI and DISCORD_INBOUND_CHANNEL_INDEX is not None and ch_idx == DISCORD_INBOUND_CHANNEL_INDEX:
+        disc_msg = f"🤖 **{AI_NODE_NAME}**: {ai_out}"
+        send_discord_message(disc_msg)
+      if is_direct:
+        send_direct_chunks(interface, ai_out, sender_node)
+      else:
+        send_broadcast_chunks(interface, ai_out, ch_idx)
+  except OSError as e:
+    error_code = getattr(e, 'errno', None) or getattr(e, 'winerror', None)
+    print(f"⚠️ OSError detected in on_receive: {e} (error code: {error_code})")
+    if error_code in (10053, 10054, 10060):
+      print("⚠️ Connection error detected. Restarting interface...")
+      global connection_status
+      connection_status = "Disconnected"
+      reset_event.set()
+    # Instead of re-raising, simply return to prevent thread crash
+    return
+  except Exception as e:
+    print(f"⚠️ Unexpected error in on_receive: {e}")
+    return
 
 @app.route("/messages", methods=["GET"])
 def get_messages_api():
@@ -1055,22 +1335,35 @@ def dashboard():
 <head>
   <title>MESH-AI Dashboard</title>
   <style>
-    :root { --theme-color: #ffa500; }
-    body { background: #000; color: #fff; font-family: Arial, sans-serif; margin: 0; padding-top: 120px; transition: filter 0.5s linear; }
-    #connectionStatus { position: fixed; top: 0; left: 0; width: 100%; z-index: 350; text-align: center; padding: 0; font-size: 14px; font-weight: bold; display: block; }
-    .header-buttons { position: fixed; top: 0; right: 0; z-index: 400; }
-    .header-buttons a { background: var(--theme-color); color: #000; padding: 8px 12px; margin: 5px; text-decoration: none; border-radius: 4px; font-weight: bold; }
-    #ticker-container { position: fixed; top: 20px; left: 0; width: 100vw; z-index: 300; height: 50px; display: flex; align-items: center; justify-content: center; pointer-events: none; }
-    #ticker { background: #111; color: var(--theme-color); white-space: nowrap; overflow: hidden; width: 100vw; min-width: 100vw; max-width: 100vw; padding: 5px 0; font-size: 36px; display: none; position: relative; border-bottom: 2px solid var(--theme-color); min-height: 50px; pointer-events: auto; }
+  :root { --theme-color: #ffa500; }
+  html, body { margin: 0; padding: 0; }
+  body { background:#000; color:#fff; font-family: Arial, sans-serif; }
+    body { background: #000; color: #fff; font-family: Arial, sans-serif; margin: 0; transition: filter 0.5s linear; }
+  #connectionStatus { position: relative; width: 100%; text-align: center; padding: 0; font-size: 14px; font-weight: bold; display: block; min-height: 20px; background: green; margin: 0; border-bottom: 1px solid var(--theme-color); }
+  /* Header buttons moved inside Send Form panel */
+  #ticker-container { position: relative; width: 100%; display: none; align-items: center; justify-content: center; pointer-events: none; margin: 0; }
+    #ticker { background: #111; color: var(--theme-color); white-space: nowrap; overflow: hidden; width: 100%; padding: 5px 0; font-size: 36px; display: none; position: relative; border-bottom: 2px solid var(--theme-color); min-height: 50px; pointer-events: auto; }
     #ticker p { display: inline-block; margin: 0; animation: tickerScroll 30s linear infinite; vertical-align: middle; min-width: 100vw; }
     #ticker .dismiss-btn { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); font-size: 18px; background: #222; color: #fff; border: 1px solid var(--theme-color); border-radius: 4px; cursor: pointer; padding: 2px 10px; z-index: 10; }
     @keyframes tickerScroll { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
-    #sendForm { margin: 20px; padding: 20px; background: #111; border: 2px solid var(--theme-color); border-radius: 10px; }
-    .three-col { display: flex; flex-direction: row; gap: 20px; margin: 20px; height: calc(100vh - 220px); }
-    .three-col .col:nth-child(1), .three-col .col:nth-child(3) { flex: 2; overflow-y: auto; }
-    .three-col .col:nth-child(2) { flex: 1; overflow-y: auto; }
+    #sendForm { margin: 20px; padding: 20px; background: #111; border: 2px solid var(--theme-color); border-radius: 10px; position: relative; }
+    .panel-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+  .panel-actions a { background: var(--theme-color); color: #000; padding: 8px 12px; margin-left: 6px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 0.95em; border: 1px solid var(--theme-color); }
+  .panel-actions button { background: #222; color: var(--theme-color); padding: 8px 12px; margin-left: 6px; border:1px solid var(--theme-color); border-radius: 4px; font-weight: bold; cursor:pointer; font-size: 0.95em; }
+    .panel-actions button:hover, .panel-actions a:hover { filter: brightness(0.9); }
+    .three-col { display: flex; flex-wrap: wrap; gap: 20px; margin: 20px; }
+    .three-col .col { flex: 1 1 100%; }
+    @media (min-width: 992px) {
+      .three-col { flex-wrap: nowrap; }
+      .three-col .col { flex: 1 1 0; }
+    }
     .lcars-panel { background: #111; padding: 20px; border: 2px solid var(--theme-color); border-radius: 10px; }
     .lcars-panel h2 { color: var(--theme-color); margin-top: 0; }
+    .lcars-panel .panel-title-row { display:flex; align-items:center; justify-content: space-between; gap: 10px; }
+    .lcars-panel .collapse-btn { background:#222; color:#fff; border:1px solid var(--theme-color); border-radius:4px; padding:2px 8px; cursor:pointer; display:none; }
+    @media (max-width: 991px) { .lcars-panel .collapse-btn { display:inline-block; } }
+    .lcars-panel .panel-body { overflow-y:auto; max-height: 50vh; }
+    @media (min-width: 992px) { .lcars-panel .panel-body { max-height: calc(100vh - 360px); } }
     .message { border: 1px solid var(--theme-color); border-radius: 4px; margin: 5px; padding: 5px; }
     .message.outgoing { background: #222; }
     .message.newMessage { border-color: #00ff00; background: #1a2; }
@@ -1101,6 +1394,14 @@ def dashboard():
     .reply-btn { margin-left: 10px; padding: 2px 8px; font-size: 0.85em; background: #222; color: var(--theme-color); border: 1px solid var(--theme-color); border-radius: 4px; cursor: pointer; }
     .mark-read-btn { margin-left: 10px; padding: 2px 8px; font-size: 0.85em; background: #222; color: #0f0; border: 1px solid #0f0; border-radius: 4px; cursor: pointer; }
     .mark-all-read-btn { margin-left: 10px; padding: 2px 8px; font-size: 0.85em; background: #222; color: #ff0; border: 1px solid #ff0; border-radius: 4px; cursor: pointer; }
+  /* React / Emoji */
+  .react-btn { margin-left: 10px; padding: 2px 8px; font-size: 0.85em; background: #222; color: #0ff; border: 1px solid #0ff; border-radius: 4px; cursor: pointer; }
+  .react-btn.sending { opacity: 0.6; pointer-events: none; }
+  .react-btn.sent { color: #0f0; border-color: #0f0; }
+  .react-btn.error { color: #f66; border-color: #f66; }
+  .emoji-picker { margin-top: 6px; display: none; gap: 6px; flex-wrap: wrap; }
+  .emoji-btn { font-size: 1.1em; padding: 2px 6px; cursor: pointer; background: #111; border: 1px solid #444; border-radius: 6px; }
+  .emoji-btn:hover { background: #222; }
     /* Threaded DM styles */
     .dm-thread { margin-bottom: 16px; border-left: 3px solid var(--theme-color); padding-left: 10px; }
     .dm-thread .message { margin-left: 0; }
@@ -1114,16 +1415,77 @@ def dashboard():
     .nodeSortBar select { background: #222; color: #fff; border: 1px solid var(--theme-color); border-radius: 4px; padding: 2px 8px; }
     /* Full width search bar for nodes */
     #nodeSearch { width: 100%; margin-bottom: 10px; font-size: 1em; padding: 6px; box-sizing: border-box; }
-    /* UI Settings panel hidden by default */
-    .settings-panel { display: none; background: #111; border: 2px solid var(--theme-color); border-radius: 10px; padding: 20px; margin: 20px; }
-    .settings-toggle { background: var(--theme-color); color: #000; padding: 8px 12px; margin: 20px; border-radius: 4px; font-weight: bold; cursor: pointer; display: inline-block; }
-    .settings-toggle.active { background: #222; color: #ffa500; }
+  /* UI Settings panel: hidden by default; shown when open */
+  .settings-panel { display: none; background: #111; border: 2px solid var(--theme-color); border-radius: 10px; padding: 20px; margin: 20px; max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+  .settings-panel.open { display: block; max-height: 70vh; overflow: auto; padding-bottom: 80px; }
+  .settings-panel .sticky-actions { position: sticky; bottom: 0; background: #111; padding-top: 10px; padding-bottom: 6px; }
     /* Timezone selector */
     #timezoneSelect { margin-left: 10px; }
+  /* Footer link bottom right */
+  .footer-right-link { position: fixed; bottom: 10px; right: 10px; z-index: 350; text-align: right; }
+  .footer-right-link .btnlink { display:inline-block; color: var(--theme-color); text-decoration: none; font-weight: bold; background: #111; padding: 6px 10px; border: 1px solid var(--theme-color); border-radius: 6px; white-space: pre-line; text-align: center; }
+  .footer-right-link .btnlink:hover { background: var(--theme-color); color: #000; }
+  /* Footer UI Settings button bottom left */
+  .footer-left-link { position: fixed; bottom: 10px; left: 10px; z-index: 350; text-align: left; }
+  .footer-left-link .btnlink { display:inline-block; color: var(--theme-color); text-decoration: none; font-weight: bold; background: #111; padding: 6px 10px; border: 1px solid var(--theme-color); border-radius: 6px; white-space: pre-line; text-align: center; cursor: pointer; }
+  .footer-left-link .btnlink:hover { background: var(--theme-color); color: #000; }
+    /* Suffix chip */
+    .suffix-chip { background:#111; color: var(--theme-color); border:1px solid var(--theme-color); padding:6px 10px; border-radius:6px; display:inline-block; }
+    /* Modal overlay for Commands */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 500; display: none; align-items: center; justify-content: center; }
+    .modal-content { background:#111; border:2px solid var(--theme-color); border-radius:10px; width: 80vw; max-width: 1000px; max-height: 80vh; overflow:auto; box-shadow: 0 0 20px rgba(0,0,0,0.6); }
+    .modal-header { display:flex; align-items:center; justify-content: space-between; padding:10px 14px; background:#222; border-bottom:2px solid var(--theme-color); }
+    .modal-header h3 { margin:0; color: var(--theme-color); }
+    .modal-close { background:#222; color:#fff; border:1px solid var(--theme-color); border-radius:4px; padding:4px 8px; cursor:pointer; }
+    .modal-body { padding: 10px 14px; }
+    .commands-table { width:100%; border-collapse: collapse; }
+    .commands-table th { text-align:left; padding:8px 10px; background:#222; border-bottom:2px solid var(--theme-color); }
+    .commands-table td { padding:8px 10px; border-bottom:1px solid #333; }
+    .commands-table code { color:#0ff; }
+  /* Masthead logo above Send a Message */
+  .masthead { display:flex; justify-content:flex-start; align-items:center; margin: 20px 20px 0 20px; }
+  .masthead .logo-wrap { position: relative; display: inline-block; }
+  .masthead img { width: clamp(140px, 20vw, 260px); height:auto; display:block; }
+  /* Theme color tint overlay for logo (masked to logo shape) */
+  .masthead .logo-overlay { position: absolute; inset: 0; background: var(--theme-color); opacity: 0.35; pointer-events: none; }
+  /* Content flows naturally; no offset needed */
+  #appRoot { padding-top: 0; }
   </style>
 
   <script>
     // --- Mark as Read/Unread State ---
+    // Ensure logo tint overlay is clipped to the logo shape
+    document.addEventListener('DOMContentLoaded', function(){
+      const logo = document.getElementById('mastheadLogo');
+      const overlay = document.querySelector('.masthead .logo-overlay');
+      function applyLogoMask(){
+        if (!logo || !overlay) return;
+        const url = getComputedStyle(logo).getPropertyValue('content'); // placeholder
+        // Use the logo src as mask
+        const src = logo.getAttribute('src');
+        if (src) {
+          overlay.style.webkitMaskImage = `url(${src})`;
+          overlay.style.maskImage = `url(${src})`;
+          overlay.style.webkitMaskSize = 'contain';
+          overlay.style.maskSize = 'contain';
+          overlay.style.webkitMaskRepeat = 'no-repeat';
+          overlay.style.maskRepeat = 'no-repeat';
+          overlay.style.webkitMaskPosition = 'center';
+          overlay.style.maskPosition = 'center';
+        }
+      }
+      if (logo.complete) applyLogoMask();
+      else logo.addEventListener('load', applyLogoMask);
+    });
+    function togglePanel(btn) {
+      const panel = btn.closest('.lcars-panel');
+      const body = panel.querySelector('.panel-body');
+      if (!body) return;
+      const isHidden = body.style.display === 'none';
+      body.style.display = isHidden ? '' : 'none';
+      btn.textContent = isHidden ? 'Collapse' : 'Expand';
+    }
+
     let readDMs = JSON.parse(localStorage.getItem("readDMs") || "[]");
     let readChannels = JSON.parse(localStorage.getItem("readChannels") || "{}");
 
@@ -1149,9 +1511,10 @@ def dashboard():
     }
     function markChannelAsRead(channelIdx) {
       if (!confirm("Are you sure you want to mark ALL messages in this channel as read?")) return;
-      let msgs = allMessages.filter(m => !m.direct && m.channel_idx == channelIdx);
+      const key = String(channelIdx);
+      let msgs = allMessages.filter(m => !m.direct && m.channel_idx != null && String(m.channel_idx) === key);
       if (!readChannels) readChannels = {};
-      readChannels[channelIdx] = msgs.map(m => m.timestamp);
+      readChannels[key] = msgs.map(m => m.timestamp);
       saveReadChannels();
       fetchMessagesAndNodes();
     }
@@ -1159,20 +1522,26 @@ def dashboard():
       return readDMs.includes(ts);
     }
     function isChannelMsgRead(ts, channelIdx) {
-      return readChannels && readChannels[channelIdx] && readChannels[channelIdx].includes(ts);
+      const key = String(channelIdx);
+      return readChannels && readChannels[key] && readChannels[key].includes(ts);
     }
 
     // --- Ticker Dismissal State ---
+    function loadDismissedSet() {
+      try { return JSON.parse(localStorage.getItem('tickerDismissedSet') || '[]'); } catch(e) { return []; }
+    }
+    function saveDismissedSet(arr) {
+      // keep it from growing forever
+      const trimmed = arr.slice(-200);
+      localStorage.setItem('tickerDismissedSet', JSON.stringify(trimmed));
+    }
     function setTickerDismissed(ts) {
-      // Store the timestamp of the dismissed message and expiry
-      localStorage.setItem("tickerDismissed", JSON.stringify({ts: ts, until: Date.now() + 30000}));
+      const set = loadDismissedSet();
+      if (!set.includes(ts)) { set.push(ts); saveDismissedSet(set); }
     }
     function isTickerDismissed(ts) {
-      let obj = {};
-      try { obj = JSON.parse(localStorage.getItem("tickerDismissed") || "{}"); } catch(e){}
-      if (!obj.ts || !obj.until) return false;
-      // Only dismiss if the same message and not expired
-      return obj.ts === ts && Date.now() < obj.until;
+      const set = loadDismissedSet();
+      return set.includes(ts);
     }
 
     // --- Timezone Offset State ---
@@ -1190,6 +1559,109 @@ def dashboard():
     var lastChannelTarget = null;
     let allNodes = [];
     let allMessages = [];
+    // --- Emoji helpers ---
+    const COMMON_EMOJIS = ["👍","❤️","😂","🔥","🎉","🙏","✅","❓","👏","😮","👀","💡","📍","🆘"];
+
+    function setReactState(btn, state) {
+      if (!btn) return;
+      btn.classList.remove('sending','sent','error');
+      btn.disabled = false;
+      if (state === 'sending') {
+        btn.disabled = true;
+        btn.classList.add('sending');
+        btn.textContent = 'Sending…';
+      } else if (state === 'sent') {
+        btn.classList.add('sent');
+        btn.textContent = 'Sent ✓';
+      } else if (state === 'error') {
+        btn.classList.add('error');
+        btn.textContent = 'Failed ✖';
+      } else {
+        btn.textContent = 'React';
+      }
+    }
+
+    function handleReactSend(reactBtn, picker, sendFn) {
+      try {
+        if (reactBtn && reactBtn.disabled) return;
+        setReactState(reactBtn, 'sending');
+        if (picker) picker.style.display = 'none';
+        Promise.resolve().then(() => sendFn())
+          .then(() => {
+            setReactState(reactBtn, 'sent');
+            setTimeout(() => setReactState(reactBtn, 'idle'), 1000);
+          })
+          .catch(err => {
+            console.error(err);
+            setReactState(reactBtn, 'error');
+            setTimeout(() => setReactState(reactBtn, 'idle'), 1200);
+            alert('Failed to send reaction: ' + (err && err.message ? err.message : err));
+          });
+      } catch (e) {
+        console.error(e);
+        setReactState(reactBtn, 'error');
+        setTimeout(() => setReactState(reactBtn, 'idle'), 1200);
+      }
+    }
+
+    function renderEmojiPicker(container, onSelect) {
+      container.innerHTML = "";
+      COMMON_EMOJIS.forEach(e => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'emoji-btn';
+        b.textContent = e;
+        b.onclick = () => { onSelect(e); container.style.display = 'none'; };
+        container.appendChild(b);
+      });
+      // Add a small close control
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.className = 'emoji-btn';
+      close.textContent = '✖';
+      close.title = 'Close';
+      close.onclick = () => { container.style.display = 'none'; };
+      container.appendChild(close);
+    }
+
+    async function sendEmojiDirect(nodeId, emoji) {
+      try {
+        const res = await fetch('/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: emoji, node_id: nodeId, direct: true })
+        });
+        const j = await res.json();
+        if (j.status !== 'sent') throw new Error(j.message || 'Failed');
+        fetchMessagesAndNodes();
+      } catch(e) { alert('Failed to send reaction: ' + e.message); }
+    }
+
+    async function sendEmojiChannel(channelIdx, emoji) {
+      try {
+        const res = await fetch('/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: emoji, channel_index: channelIdx, direct: false })
+        });
+        const j = await res.json();
+        if (j.status !== 'sent') throw new Error(j.message || 'Failed');
+        fetchMessagesAndNodes();
+      } catch(e) { alert('Failed to send reaction: ' + e.message); }
+    }
+
+    function quickSendEmojiFromForm(emoji) {
+      // Insert emoji into the message box at the cursor position, do not auto-send
+      const ta = document.getElementById('messageBox');
+      if (!ta) return;
+      const start = ta.selectionStart ?? ta.value.length;
+      const end = ta.selectionEnd ?? ta.value.length;
+      const insert = emoji + ' ';
+      ta.value = ta.value.slice(0, start) + insert + ta.value.slice(end);
+      const newPos = start + insert.length;
+      ta.selectionStart = ta.selectionEnd = newPos;
+      ta.focus();
+    }
     let lastMessageTimestamp = null;
     let tickerTimeout = null;
     let tickerLastShownTimestamp = null;
@@ -1295,18 +1767,26 @@ def dashboard():
       document.getElementById('modeSwitch').addEventListener('change', function() {
         toggleMode();
       });
-      document.getElementById('settingsToggle').addEventListener('click', function() {
-        const panel = document.getElementById('settingsPanel');
-        if (panel.style.display === 'none' || panel.style.display === '') {
-          panel.style.display = 'block';
-          this.textContent = "Hide UI Settings";
+      const settingsBtn = document.getElementById('settingsFloatBtn');
+      const settingsPanel = document.getElementById('settingsPanel');
+  // Ensure hidden state by default
+  settingsPanel.classList.remove('open');
+  settingsBtn.textContent = "Show UI Settings";
+      settingsBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        const opening = !settingsPanel.classList.contains('open');
+        if (opening) {
+          settingsPanel.classList.add('open');
+          this.textContent = 'Hide UI Settings';
+          // After opening, scroll the page to the bottom to reveal all settings
+          requestAnimationFrame(() => {
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+          });
         } else {
-          panel.style.display = 'none';
-          this.textContent = "Show UI Settings";
+          settingsPanel.classList.remove('open');
+          this.textContent = 'Show UI Settings';
         }
       });
-      document.getElementById('settingsPanel').style.display = 'none'; // Hide settings panel by default
-      document.getElementById('settingsToggle').textContent = "Show UI Settings";
       document.getElementById('nodeSearch').addEventListener('input', function() {
         filterNodes(this.value, false);
       });
@@ -1360,6 +1840,9 @@ def dashboard():
         setIncomingSound(uiSettings.soundURL);
         // Save timezone offset
         setTimezoneOffset(document.getElementById('timezoneSelect').value);
+        // Keep Apply button visible after changes
+        const sticky = document.querySelector('.sticky-actions');
+        if (sticky) sticky.scrollIntoView({ behavior: 'smooth', block: 'end' });
         fetchMessagesAndNodes();
       });
 
@@ -1409,14 +1892,25 @@ def dashboard():
       stopHueRotate();
       hueRotateInterval = setInterval(function() {
         currentHue = (currentHue + 1) % 360;
-        document.body.style.filter = `hue-rotate(${currentHue}deg)`;
+        const root = document.getElementById('appRoot') || document.body;
+        root.style.filter = `hue-rotate(${currentHue}deg)`;
+        // Ensure logo overlay tint remains constant (not hue-rotated)
+        const logoOverlay = document.querySelector('.masthead .logo-overlay');
+        if (logoOverlay) {
+          logoOverlay.style.filter = 'none';
+        }
       }, Math.max(5, 1000 / Math.max(1, speed)));
     }
     function stopHueRotate() {
       if (hueRotateInterval) clearInterval(hueRotateInterval);
       hueRotateInterval = null;
-      document.body.style.filter = "";
+      const root = document.getElementById('appRoot') || document.body;
+      root.style.filter = "";
       currentHue = 0;
+      const logoOverlay = document.querySelector('.masthead .logo-overlay');
+      if (logoOverlay) {
+        logoOverlay.style.filter = 'none';
+      }
     }
     function toggleHueRotate(enabled, speed) {
       uiSettings.hueRotateEnabled = enabled;
@@ -1522,6 +2016,64 @@ def dashboard():
       } catch (e) { console.error(e); }
     }
 
+    // --- Commands Modal ---
+    async function openCommandsModal() {
+      try {
+        const res = await fetch('/commands_info');
+        const data = await res.json();
+        const tbody = document.getElementById('commandsTableBody');
+        tbody.innerHTML = '';
+        data.forEach(item => {
+          const tr = document.createElement('tr');
+          const tdCmd = document.createElement('td');
+          const tdDesc = document.createElement('td');
+          tdCmd.innerHTML = `<code>${item.command}</code>`;
+          tdDesc.textContent = item.description || '';
+          tr.appendChild(tdCmd);
+          tr.appendChild(tdDesc);
+          tbody.appendChild(tr);
+        });
+        document.getElementById('commandsModal').style.display = 'flex';
+      } catch (e) { console.error(e); }
+    }
+    function closeCommandsModal() {
+      document.getElementById('commandsModal').style.display = 'none';
+    }
+
+    // --- Config Modal ---
+    function openConfigModal() { document.getElementById('configModal').style.display = 'flex'; loadConfigFiles(); }
+    function closeConfigModal() { document.getElementById('configModal').style.display = 'none'; }
+    function showConfigTab(which){
+      document.getElementById('cfgTab').style.display = (which==='cfg')?'block':'none';
+      document.getElementById('cmdTab').style.display = (which==='cmd')?'block':'none';
+      document.getElementById('motdTab').style.display = (which==='motd')?'block':'none';
+    }
+    async function loadConfigFiles(){
+      try{
+        const r = await fetch('/config_editor/load');
+        if(!r.ok){ throw new Error('Load failed'); }
+        const data = await r.json();
+        document.getElementById('cfgEditor').value = JSON.stringify(data.config || {}, null, 2);
+        document.getElementById('cmdEditor').value = JSON.stringify(data.commands_config || {}, null, 2);
+        document.getElementById('motdEditor').value = data.motd || '';
+      }catch(e){ alert('Error loading config files: '+e.message); }
+    }
+    async function saveConfigFiles(){
+      try{
+        let cfgText = document.getElementById('cfgEditor').value;
+        let cmdText = document.getElementById('cmdEditor').value;
+        let motdText = document.getElementById('motdEditor').value;
+        let cfgJson = {};
+        let cmdJson = {};
+        try{ cfgJson = JSON.parse(cfgText); cfgText = JSON.stringify(cfgJson, null, 2); document.getElementById('cfgEditor').value = cfgText; } catch(e){ return alert('config.json is not valid JSON: '+e.message); }
+        try{ cmdJson = JSON.parse(cmdText); cmdText = JSON.stringify(cmdJson, null, 2); document.getElementById('cmdEditor').value = cmdText; } catch(e){ return alert('commands_config.json is not valid JSON: '+e.message); }
+        const r = await fetch('/config_editor/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ config: cfgJson, commands_config: cmdJson, motd: motdText }) });
+        const res = await r.json();
+        if(!r.ok){ throw new Error(res.message||'Save failed'); }
+        alert('Saved. Some changes require restarting the service to take effect.');
+      }catch(e){ alert('Error saving: '+e.message); }
+    }
+
     function updateMessagesUI(messages) {
       // Reverse the order to show the newest messages first
       const groups = {};
@@ -1588,6 +2140,21 @@ def dashboard():
             }
           };
           wrap.appendChild(markBtn);
+
+          // React button and emoji picker
+          const reactBtn = document.createElement('button');
+          reactBtn.type = 'button';
+          reactBtn.textContent = 'React';
+          reactBtn.className = 'react-btn';
+          const picker = document.createElement('div');
+          picker.className = 'emoji-picker';
+          renderEmojiPicker(picker, (emoji) => handleReactSend(reactBtn, picker, () => sendEmojiChannel(ch, emoji)));
+          reactBtn.onclick = function() {
+            if (reactBtn.disabled) return;
+            picker.style.display = (picker.style.display === 'flex') ? 'none' : 'flex';
+          };
+          wrap.appendChild(reactBtn);
+          wrap.appendChild(picker);
 
           channelDiv.appendChild(wrap);
         });
@@ -1673,6 +2240,21 @@ def dashboard():
           };
           wrap.appendChild(markBtn);
 
+          // React button and picker for root DM
+          const reactBtn = document.createElement('button');
+          reactBtn.type = 'button';
+          reactBtn.textContent = 'React';
+          reactBtn.className = 'react-btn';
+          const picker = document.createElement('div');
+          picker.className = 'emoji-picker';
+          renderEmojiPicker(picker, (emoji) => handleReactSend(reactBtn, picker, () => sendEmojiDirect(nodeId, emoji)));
+          reactBtn.onclick = function() {
+            if (reactBtn.disabled) return;
+            picker.style.display = (picker.style.display === 'flex') ? 'none' : 'flex';
+          };
+          wrap.appendChild(reactBtn);
+          wrap.appendChild(picker);
+
           threadDiv.appendChild(wrap);
 
           // Find replies to this root
@@ -1708,6 +2290,21 @@ def dashboard():
                 markDMAsRead(replyMsg.timestamp);
               };
               replyWrap.appendChild(markBtn2);
+
+              // React for reply
+              const reactBtn2 = document.createElement('button');
+              reactBtn2.type = 'button';
+              reactBtn2.textContent = 'React';
+              reactBtn2.className = 'react-btn';
+              const picker2 = document.createElement('div');
+              picker2.className = 'emoji-picker';
+              renderEmojiPicker(picker2, (emoji) => handleReactSend(reactBtn2, picker2, () => sendEmojiDirect(nodeId, emoji)));
+              reactBtn2.onclick = function() {
+                if (reactBtn2.disabled) return;
+                picker2.style.display = (picker2.style.display === 'flex') ? 'none' : 'flex';
+              };
+              replyWrap.appendChild(reactBtn2);
+              replyWrap.appendChild(picker2);
 
               repliesDiv.appendChild(replyWrap);
             });
@@ -1752,7 +2349,7 @@ def dashboard():
             d.appendChild(longName);
           }
 
-          // Info line 1: GPS/map, distance
+          // Info line 1: GPS/map, DM button, distance
           const infoLine1 = document.createElement("div");
           infoLine1.className = "nodeInfoLine";
           let gps = nodeGPSInfo[String(n.id)];
@@ -1765,6 +2362,14 @@ def dashboard():
             mapA.title = "Show on Google Maps";
             mapA.innerHTML = "🗺️";
             infoLine1.appendChild(mapA);
+
+            // DM button next to Map
+            const dmBtn = document.createElement("button");
+            dmBtn.textContent = "DM";
+            dmBtn.className = "reply-btn";
+            dmBtn.style.marginLeft = "6px";
+            dmBtn.onclick = () => dmToNode(n.id, n.shortName);
+            infoLine1.appendChild(dmBtn);
 
             // Distance
             if (myGPS && myGPS.lat != null && myGPS.lon != null) {
@@ -1780,19 +2385,7 @@ def dashboard():
           }
           d.appendChild(infoLine1);
 
-          // Info line 2: Beacon/reporting time
-          const infoLine2 = document.createElement("div");
-          infoLine2.className = "nodeInfoLine";
-          if (gps && gps.beacon_time) {
-            const beacon = document.createElement("span");
-            beacon.className = "nodeBeacon";
-            beacon.title = "Last beacon/reporting time";
-            beacon.innerHTML = `🕒 ${getTZAdjusted(gps.beacon_time)}`;
-            infoLine2.appendChild(beacon);
-          }
-          d.appendChild(infoLine2);
-
-          // Info line 3: Hops
+          // Info line 2: Hops
           const infoLine3 = document.createElement("div");
           infoLine3.className = "nodeInfoLine";
           // Only show hops if available and not null/undefined/""
@@ -1806,12 +2399,17 @@ def dashboard():
           }
           // If hops is not available, do not show this section at all
 
-          // DM button
-          const btn = document.createElement("button");
-          btn.textContent = "DM";
-          btn.className = "btn";
-          btn.onclick = () => dmToNode(n.id, n.shortName);
-          d.append(btn);
+          // Info line 3 (last): Beacon/reporting time
+          const infoLine2 = document.createElement("div");
+          infoLine2.className = "nodeInfoLine";
+          if (gps && gps.beacon_time) {
+            const beacon = document.createElement("span");
+            beacon.className = "nodeBeacon";
+            beacon.title = "Last beacon/reporting time";
+            beacon.innerHTML = `🕒 ${getTZAdjusted(gps.beacon_time)}`;
+            infoLine2.appendChild(beacon);
+          }
+          d.appendChild(infoLine2);
 
           list.appendChild(d);
         });
@@ -1862,7 +2460,13 @@ def dashboard():
         m.node !== "Twilio" &&
         m.node !== "DiscordPoll" &&
         m.node !== """ + json.dumps(AI_NODE_NAME) + """ &&
-        (!m.reply_to) // Only show original messages, not replies (AI responses)
+        (!m.reply_to) && // Only show original messages, not replies (AI responses)
+        (
+          // For DMs: not marked as read
+          (m.direct && !isDMRead(m.timestamp)) ||
+          // For channel messages: not marked as read
+          (!m.direct && m.channel_idx != null && !isChannelMsgRead(m.timestamp, m.channel_idx))
+        )
       );
       if (!inbound.length) return hideTicker();
       let latest = inbound[inbound.length - 1];
@@ -1875,10 +2479,12 @@ def dashboard():
       if (tickerLastShownTimestamp === latest.timestamp) return;
       tickerLastShownTimestamp = latest.timestamp;
 
-      let ticker = document.getElementById('ticker');
+  let ticker = document.getElementById('ticker');
+  let tContainer = document.getElementById('ticker-container');
       let tickerMsg = ticker.querySelector('p');
       tickerMsg.textContent = latest.message;
-      ticker.style.display = 'block';
+  if (tContainer) tContainer.style.display = 'flex';
+  ticker.style.display = 'block';
 
       // Show dismiss button at far right, on top
       let dismissBtn = ticker.querySelector('.dismiss-btn');
@@ -1889,6 +2495,7 @@ def dashboard():
         dismissBtn.onclick = function(e) {
           e.stopPropagation();
           ticker.style.display = 'none';
+          if (tContainer) tContainer.style.display = 'none';
           setTickerDismissed(latest.timestamp);
           if (tickerTimeout) clearTimeout(tickerTimeout);
         };
@@ -1898,15 +2505,17 @@ def dashboard():
         dismissBtn.onclick = function(e) {
           e.stopPropagation();
           ticker.style.display = 'none';
+          if (tContainer) tContainer.style.display = 'none';
           setTickerDismissed(latest.timestamp);
           if (tickerTimeout) clearTimeout(tickerTimeout);
         };
       }
 
-      // Remove after 30s and persist dismiss
+      // Remove after 30s and persist dismiss (persist across refresh)
       if (tickerTimeout) clearTimeout(tickerTimeout);
       tickerTimeout = setTimeout(() => {
         ticker.style.display = 'none';
+        if (tContainer) tContainer.style.display = 'none';
         setTickerDismissed(latest.timestamp);
         tickerLastShownTimestamp = null;
       }, 30000);
@@ -1914,7 +2523,9 @@ def dashboard():
 
     function hideTicker() {
       let ticker = document.getElementById('ticker');
+      let tContainer = document.getElementById('ticker-container');
       ticker.style.display = 'none';
+      if (tContainer) tContainer.style.display = 'none';
       tickerLastShownTimestamp = null;
       if (tickerTimeout) {
         clearTimeout(tickerTimeout);
@@ -1927,13 +2538,15 @@ def dashboard():
         .then(r => r.json())
         .then(d => {
           const s = document.getElementById("connectionStatus");
-          if (d.status != "Connected") {
+          if (d.status !== "Connected") {
+            s.style.display = "block";
             s.style.background = "red";
-            s.style.height = "40px";
-            s.textContent = `Connection Error: ${d.error}`;
+            s.style.minHeight = "28px";
+            s.textContent = `Connection Error: ${d.error || 'Disconnected'}`;
           } else {
+            s.style.display = "block";
             s.style.background = "green";
-            s.style.height = "20px";
+            s.style.minHeight = "20px";
             s.textContent = "Connected";
           }
         })
@@ -1945,8 +2558,23 @@ def dashboard():
       setInterval(fetchMessagesAndNodes, 10000);
       fetchMessagesAndNodes();
       toggleMode(); // Set initial mode
+      // Populate quick emoji bar
+      const bar = document.getElementById('quickEmojiBar');
+      if (bar) {
+        bar.innerHTML = '';
+        COMMON_EMOJIS.forEach(e => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'emoji-btn';
+          b.textContent = e;
+          b.title = 'Insert emoji ' + e;
+          b.setAttribute('aria-label', 'Insert emoji ' + e);
+          b.onclick = () => quickSendEmojiFromForm(e);
+          bar.appendChild(b);
+        });
+      }
     }
-    window.addEventListener("load", onPageLoad);
+  window.addEventListener("load", () => { onPageLoad(); pollStatus(); });
 
     // --- Discord Messages Section ---
     function updateDiscordMessagesUI(messages) {
@@ -1976,16 +2604,34 @@ def dashboard():
     }
   </script>
 </head>
-<body onload="onPageLoad()">
+<body>
+  <div id="appRoot">
   <div id="connectionStatus"></div>
-  <div class="header-buttons"><a href="/logs" target="_blank">Logs</a></div>
+  """ + f"""
+  
+  """ + """
   <div id="ticker-container">
     <div id="ticker"><p></p></div>
   </div>
   <audio id="incomingSound"></audio>
 
+  <div class="masthead">
+    <span class="logo-wrap">
+      <img id="mastheadLogo" src="https://mr-tbot.com/wp-content/uploads/2025/09/MESH-AI.png" alt="MESH-AI Logo" loading="lazy">
+      <span class="logo-overlay"></span>
+    </span>
+  </div>
+
   <div class="lcars-panel" id="sendForm">
-    <h2>Send a Message</h2>
+    <div class="panel-header">
+      <h2>Send a Message</h2>
+      <div class="panel-actions">
+  <span class="suffix-chip" title="Current AI alias and suffix">""" + f"{AI_ALIAS_CANONICAL} (suffix: {AI_SUFFIX})" + """</span>
+  <button type="button" onclick="openCommandsModal()">Commands</button>
+  <button type="button" onclick="openConfigModal()">Config</button>
+  <a href="/logs" target="_blank">Logs</a>
+      </div>
+    </div>
     <form method="POST" action="/ui_send">
       <label>Message Mode:</label>
       <label class="switch">
@@ -2012,46 +2658,62 @@ def dashboard():
 
       <label>Message:</label><br>
       <textarea id="messageBox" name="message" rows="3" style="width:80%;"></textarea>
+  <div id="quickEmojiBar" style="margin:6px 0; display:flex; flex-wrap:wrap; gap:6px;"></div>
       <div id="charCounter">Characters: 0/1000, Chunks: 0/5</div><br>
-      <button type="submit">Send</button>
-      <button type="button" onclick="replyToLastDM()">Reply to Last DM</button>
-      <button type="button" onclick="replyToLastChannel()">Reply to Last Channel</button>
+  <button type="submit" class="reply-btn">Send</button>
+  <button type="button" class="reply-btn" onclick="replyToLastDM()">Reply to Last DM</button>
+  <button type="button" class="reply-btn" onclick="replyToLastChannel()">Reply to Last Channel</button>
     </form>
   </div>
 
   <div class="three-col">
     <div class="col">
       <div class="lcars-panel">
-        <h2>Channel Messages</h2>
-        <div id="channelDiv"></div>
-      </div>
-    </div>
-    <div class="col">
-      <div class="lcars-panel">
-        <h2>Available Nodes</h2>
-        <input type="text" id="nodeSearch" placeholder="Search nodes by name, id, or long name...">
-        <div class="nodeSortBar">
-          <label for="nodeSortKey">Sort by:</label>
-          <select id="nodeSortKey">
-            <option value="name">Name</option>
-            <option value="beacon">Last Reporting Time</option>
-            <option value="hops">Number of Hops</option>
-            <option value="gps">GPS Enabled</option>
-            <option value="distance">Distance</option>
-          </select>
-          <label for="nodeSortDir">Order:</label>
-          <select id="nodeSortDir">
-            <option value="asc">Ascending</option>
-            <option value="desc">Descending</option>
-          </select>
+        <div class="panel-title-row">
+          <h2>Direct Messages</h2>
+          <button class="collapse-btn" onclick="togglePanel(this)">Collapse</button>
         </div>
-        <div id="nodeListDiv"></div>
+        <div class="panel-body">
+          <div id="dmMessagesDiv"></div>
+        </div>
       </div>
     </div>
     <div class="col">
       <div class="lcars-panel">
-        <h2>Direct Messages</h2>
-        <div id="dmMessagesDiv"></div>
+        <div class="panel-title-row">
+          <h2>Channel Messages</h2>
+          <button class="collapse-btn" onclick="togglePanel(this)">Collapse</button>
+        </div>
+        <div class="panel-body">
+          <div id="channelDiv"></div>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="lcars-panel">
+        <div class="panel-title-row">
+          <h2>Available Nodes</h2>
+          <button class="collapse-btn" onclick="togglePanel(this)">Collapse</button>
+        </div>
+        <div class="panel-body">
+          <input type="text" id="nodeSearch" placeholder="Search nodes by name, id, or long name...">
+          <div class="nodeSortBar">
+            <label for="nodeSortKey">Sort by:</label>
+            <select id="nodeSortKey">
+              <option value="name">Name</option>
+              <option value="beacon">Last Reporting Time</option>
+              <option value="hops">Number of Hops</option>
+              <option value="gps">GPS Enabled</option>
+              <option value="distance">Distance</option>
+            </select>
+            <label for="nodeSortDir">Order:</label>
+            <select id="nodeSortDir">
+              <option value="asc">Ascending</option>
+              <option value="desc">Descending</option>
+            </select>
+          </div>
+          <div id="nodeListDiv"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -2060,8 +2722,54 @@ def dashboard():
     <h2>Discord Messages</h2>
     <div id="discordMessagesDiv"></div>
   </div>
-
-  <div class="settings-toggle" id="settingsToggle">Show UI Settings</div>
+  <div class="footer-right-link"><a class="btnlink" href="https://mesh-ai.dev" target="_blank">MESH-AI v0.6.0 PR1\nby: MR-TBOT</a></div>
+  <div class="footer-left-link"><a class="btnlink" href="#" id="settingsFloatBtn">Show UI Settings</a></div>
+  <div id="commandsModal" class="modal-overlay" onclick="if(event.target===this) closeCommandsModal()">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Available Commands</h3>
+        <button class="modal-close" onclick="closeCommandsModal()">Close</button>
+      </div>
+      <div class="modal-body">
+        <table class="commands-table">
+          <thead><tr><th>Command</th><th>Description</th></tr></thead>
+          <tbody id="commandsTableBody"></tbody>
+        </table>
+        <div style="margin-top:8px;color:#ccc;">Most built-ins require your unique dashed suffix. Exceptions: /emergency, /911, /ping, /test.</div>
+      </div>
+    </div>
+  </div>
+  <div id="configModal" class="modal-overlay" onclick="if(event.target===this) closeConfigModal()">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Configuration Editor</h3>
+        <button class="modal-close" onclick="closeConfigModal()">Close</button>
+      </div>
+      <div class="modal-body">
+        <div style="margin-bottom:8px;">
+          <button class="reply-btn" onclick="loadConfigFiles()">Reload from Disk</button>
+          <button class="mark-read-btn" onclick="saveConfigFiles()">Save All</button>
+        </div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:8px;">
+          <button class="reply-btn" onclick="showConfigTab('cfg')">config.json</button>
+          <button class="reply-btn" onclick="showConfigTab('cmd')">commands_config.json</button>
+          <button class="reply-btn" onclick="showConfigTab('motd')">motd.json</button>
+        </div>
+        <div id="cfgTab" style="display:block;">
+          <textarea id="cfgEditor" style="width:100%; height:40vh; background:#000; color:#0f0; border:1px solid var(--theme-color);"></textarea>
+        </div>
+        <div id="cmdTab" style="display:none;">
+          <textarea id="cmdEditor" style="width:100%; height:40vh; background:#000; color:#0ff; border:1px solid var(--theme-color);"></textarea>
+        </div>
+        <div id="motdTab" style="display:none;">
+          <textarea id="motdEditor" style="width:100%; height:40vh; background:#000; color:#ffa; border:1px solid var(--theme-color);"></textarea>
+        </div>
+        <div style="margin-top:8px; color:#ccc;">
+          Tip: Ensure valid JSON for config and commands. The editor will try to pretty-format on save.
+        </div>
+      </div>
+    </div>
+  </div>
   <div class="settings-panel" id="settingsPanel">
     <h2>UI Settings</h2>
     <label for="uiColorPicker">Theme Color:</label>
@@ -2080,9 +2788,53 @@ def dashboard():
     for tz in range(-12, 15):
         html += f'      <option value="{tz}">{tz:+d}</option>\n'
     html += """    </select><br><br>
-    <button id="applySettingsBtn" type="button">Apply Settings</button>
+    <div class=\"sticky-actions\">
+      <button id=\"applySettingsBtn\" type=\"button\">Apply Settings</button>
+    </div>
   </div>
+</div>
 </body>
+</html>
+"""
+    return html
+
+# -----------------------------
+# Commands page route
+# -----------------------------
+@app.route("/commands", methods=["GET"])
+def commands_page():
+    cmds = get_available_commands_list()
+    items_html = "\n".join(
+        f"<tr><td style='padding:6px 10px; border-bottom:1px solid #333;'><code>{cmd}</code></td>"
+        f"<td style='padding:6px 10px; border-bottom:1px solid #333;'>{desc}</td></tr>" for cmd, desc in cmds
+    )
+    html = f"""
+<html>
+  <head>
+    <title>MESH-AI Commands</title>
+    <style>
+      body {{ background:#000; color:#fff; font-family: Arial, sans-serif; padding:20px; }}
+      h1 {{ color:#ffa500; }}
+      table {{ width:100%; border-collapse: collapse; background:#111; border: 2px solid #ffa500; border-radius: 8px; overflow:hidden; }}
+      th {{ text-align:left; padding:10px; background:#222; border-bottom:2px solid #ffa500; }}
+      code {{ color:#0ff; }}
+      .note {{ color:#ccc; margin-top:10px; }}
+      .alias {{ position: fixed; top: 10px; right: 10px; background:#111; border:1px solid #ffa500; color:#ffa500; padding:6px 10px; border-radius:6px; }}
+    </style>
+  </head>
+  <body>
+  <div class="alias">Alias: {AI_ALIAS_CANONICAL} (suffix: {AI_SUFFIX})</div>
+    <h1>Available Commands</h1>
+    <table>
+      <thead>
+        <tr><th>Command</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        {items_html}
+      </tbody>
+    </table>
+    <div class="note">Most built-ins require your unique dashed suffix. Exceptions: /emergency, /911, /ping, /test.</div>
+  </body>
 </html>
 """
     return html
@@ -2124,15 +2876,23 @@ def send_message():
     node_id = data.get("node_id")
     channel_idx = data.get("channel_index", 0)
     direct = data.get("direct", False)
-    if not message or node_id is None:
-        return jsonify({"status": "error", "message": "Missing 'message' or 'node_id'"}), 400
+    # Validate inputs: allow either Direct (requires node_id) or Broadcast (requires channel_index)
+    if not message:
+        return jsonify({"status": "error", "message": "Missing 'message'"}), 400
     try:
         if direct:
+            if node_id is None:
+                return jsonify({"status": "error", "message": "Missing 'node_id' for direct send"}), 400
             log_message("WebUI", f"{message} [to: {get_node_shortname(node_id)} ({node_id})]", direct=True)
             info_print(f"[Info] Direct send to node {node_id} => '{message}'")
             send_direct_chunks(interface, message, node_id)
             return jsonify({"status": "sent", "to": node_id, "direct": True, "message": message})
         else:
+            # channel_idx may come as string; ensure int and default to 0 if invalid
+            try:
+                channel_idx = int(channel_idx)
+            except Exception:
+                channel_idx = 0
             log_message("WebUI", f"{message} [to: Broadcast Channel {channel_idx}]", direct=False, channel_idx=channel_idx)
             info_print(f"[Info] Broadcast on ch={channel_idx} => '{message}'")
             send_broadcast_chunks(interface, message, channel_idx)
@@ -2140,6 +2900,12 @@ def send_message():
     except Exception as e:
         print(f"⚠️ Failed to send: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+# Lightweight JSON endpoint for commands list (used by modal overlay)
+@app.route("/commands_info", methods=["GET"])
+def commands_info():
+  cmds = [{"command": c, "description": d} for c, d in get_available_commands_list()]
+  return jsonify(cmds)
 
 def connect_interface():
     """Return a Meshtastic interface with the baud rate from config.
@@ -2202,11 +2968,19 @@ def connection_status_route():
     return jsonify({"status": connection_status, "error": last_error_message})
 
 def main():
-    global interface, restart_count, server_start_time, reset_event
+    global interface, restart_count, server_start_time, reset_event, STARTUP_INFO_PRINTED
     server_start_time = server_start_time or datetime.now(timezone.utc)
     restart_count += 1
     add_script_log(f"Server restarted. Restart count: {restart_count}")
     print("Starting MESH-AI server...")
+    # Print example AI suffix (alias) and commands immediately after startup banner
+    if not STARTUP_INFO_PRINTED:
+        try:
+            print(f"example AI command Suffix (Alias): -{AI_SUFFIX} (can be set in config)")
+            print(f"Commands: {get_available_commands_text()}")
+        except Exception as e:
+            print(f"⚠️ Could not print commands list: {e}")
+        STARTUP_INFO_PRINTED = True
     load_archive()
         # Additional startup info:
     if ENABLE_DISCORD:

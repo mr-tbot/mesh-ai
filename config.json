@@ -5,9 +5,13 @@
   "wifi_host": "MESHTASTIC NODE IP HERE",
   "wifi_port": 4403,
   
+  "ai_respond_on_longfast": false,
+  "respond_to_mqtt_messages": false,
+  
   "serial_port": "/dev/ttyUSB0",
   "serial_baud": 460800,
 
+  "ai_command": "",
   "ai_provider": "lmstudio, openai, or ollama",
   "system_prompt": "You are a helpful assistant responding to mesh network chats. Respond in as few words as possible while still answering fully.",
 
@@ -23,15 +27,17 @@
   "ollama_url": "http://localhost:11434/api/generate",
   "ollama_model": "llama3",
   "ollama_timeout": 60,
+  "ollama_options": {},
+  "ollama_keep_alive": "10m",
 
+  "home_assistant_enabled": false,
+  "home_assistant_channel_index": 1,
   "home_assistant_url": "http://homeassistant.local:8123/api/conversation/process",
   "home_assistant_token": "INPUT HA TOKEN HERE",
   "home_assistant_timeout": 90,
   "home_assistant_enable_pin": false,
   "home_assistant_secure_pin": "1234",
 
-  "home_assistant_enabled": false,
-  "home_assistant_channel_index": 1,
 
   "channel_names": {
     "0": "LongFast",
@@ -55,6 +61,8 @@
   
   "local_location_string": "@ YOUR LOCATION HERE",
   "ai_node_name": "Mesh-AI-Alpha",
+
+  "force_node_num": null,
   "max_message_log": 0,
 
   "enable_twilio": false,
@@ -63,6 +71,10 @@
   "twilio_sid": "TWILIO_SID",
   "twilio_auth_token": "TWILIO_AUTH_TOKEN",
   "twilio_from_number": "+14444444444",
+
+  "twilio_inbound_target": "channel",
+  "twilio_inbound_channel_index": 1,
+  "twilio_inbound_node": "!FFFFFFFF",
 
   "smtp_host": "SMTP HOST HERE",
   "smtp_port": 465,
@@ -74,5 +86,10 @@
   "discord_webhook_url": "",
   "discord_send_emergency": false,
   "discord_send_ai": false,
-  "discord_send_all": false
+  "discord_send_all": false,
+  "discord_receive_enabled": true,
+  "discord_inbound_channel_index": null,
+  "discord_response_channel_index": null,
+  "discord_bot_token": "",
+  "discord_channel_id": ""
 }

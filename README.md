@@ -1,8 +1,11 @@
-# MESH-AI (BETA v0.5.1) - NOW IN BETA!
+# MESH-AI (BETA v0.6.0 - PRE-RELEASE 1) - some updated features and packages may introduce unforeseen bugs - PLEASE REPORT ANY ISSUES ASAP BEFORE FULL PACKAGE RELEASE AND DOCKER IMAGE UPDATES.
 
-- PLEASE NOTE - MESH-AI is out of ALPHA!  There are new requirements and new config options!  Old configs should work out of the box - but please see below for changes.
+- PLEASE NOTE - There are new requirements and new config options - v0.6.0 updates many required library versions - and brings us into alignment with the 2.7 branch of the Meshtastic Python library!  Old configs should work out of the box - but there are new config flags and a new "description" feature for custom commands in commands_config.json.  Read the changelogs.
 
-**This release is functionally the same as v0.5.0 - but has been rebranded to MESH-AI for trademark compliance and respect for the official Meshtastic.org project.  This project is getting a lot of attention now - and I am actively reaching out to the Meshtastic team for guidance on how to develop respectfully in their ecosystem - all previous ALPHA releases are going to be pulled from the repo.**
+# Having issues getting up and running?  As of v0.6.0 I have created a custom GPT with Open-AI to assist anyone having problems - give it a try! - https://chatgpt.com/g/g-68d86345f4c4819183c417b3790499c7-mesh-ai-setup-assistant
+
+
+
 
 ![MESH-AI](https://github.com/user-attachments/assets/438dc643-6727-439d-a719-0fb905bec920)
 
@@ -33,24 +36,34 @@ The Meshtastic logo trademark is the trademark of Meshtastic LLC.
 - **Home Assistant Integration**  
   - Seamlessly forward messages from a designated channel to Home Assistant’s conversation API. Optionally secure the integration using a PIN.
 - **Advanced Slash Commands**  
-  - Built‑in commands: `/about`, `/ping`, `/test`, `/help`, `/motd`, `/ai` (aliases: `/bot`, `/query`, `/data`), `/emergency` (or `/911`), `/whereami` plus custom commands via `commands_config.json`.
+  - Built‑in commands: suffixed `/about-XY`, `/help-XY`, `/motd-XY`, `/whereami-XY`, AI commands with your unique suffix (e.g., `/ai-XY`, `/bot-XY`, `/query-XY`, `/data-XY`), unsuffixed `/test`, and unsuffixed `/emergency` (or `/911`), plus custom commands via `commands_config.json`.
   - Commands are now case‑insensitive for improved mobile usability.
+  - New: a per-install randomized alias (e.g. `/ai-9z`) is generated on first run to reduce collisions when multiple bots exist on the same mesh or MQTT network. You can change it in `config.json` (field `ai_command`). All AI commands require this suffix, and other built‑ins (except emergency/911) also require your suffix.
+  - Strongly encouraged: customize your commands in `commands_config.json` to avoid collisions with other users.
 - **Emergency Alerts**  
   - Trigger alerts that are sent via **Twilio SMS**, **SMTP Email**, and, if enabled, **Discord**.
   - Emergency notifications include GPS coordinates, UTC timestamps, and user messages.
 - **Enhanced REST API & WebUI Dashboard**  
-  - A modern three‑column layout showing broadcast messages, direct messages, and available nodes.
-  - Additional endpoints include `/messages`, `/nodes`, `/connection_status`, `/logs`, `/send`, `/ui_send`, and a new `/discord_webhook` for inbound Discord messages.
+  - A modern three‑column layout showing direct messages, channel messages, and available nodes. Stacks on mobile; 3‑wide on desktop. Controls (suffix, Logs, Commands) live in the “Send a Message” header (top‑right).
+  - Additional endpoints include `/messages`, `/nodes`, `/connection_status`, `/logs`, `/logs_stream`, `/send`, `/ui_send`, `/commands_info` (JSON commands list), and a new `/discord_webhook` for inbound Discord messages.
   - UI customization through settings such as theme color, hue rotation, and custom sounds.
+  - Emoji enhancements: each message has a React button that reveals a compact, hidden emoji picker; choosing an emoji auto‑sends a reaction (DM or channel). The send form includes a Quick Emoji bar that inserts emojis into your draft (does not auto‑send).
 - **Improved Message Chunking & Routing**  
   - Automatically splits long AI responses into configurable chunks with delays to reduce radio congestion.
   - Configurable flags control whether the bot replies to broadcast channels and/or direct messages.
+  - New: LongFast (channel 0) response toggle — by default the bot will NOT respond on LongFast to avoid congestion. Enable `ai_respond_on_longfast` only if your local mesh agrees.
+  - Etiquette: Using AI bots on public LongFast is discouraged; keep it off unless you’re on an isolated/private mesh with community consent.
 - **Robust Error Handling & Logging**  
   - Uses UTC‑based timestamps with an auto‑truncating script log file (keeping the last 100 lines if the file grows beyond 100 MB).
   - Enhanced error detection (including specific OSError codes) and graceful reconnection using threaded exception hooks.
 - **Discord Integration Enhancements**  
   - Route messages to and from Discord.
   - New configuration options and a dedicated `/discord_webhook` endpoint allow for inbound Discord message processing.
+  - MQTT-aware response gating: set `respond_to_mqtt_messages` to true in `config.json` if you want the bot to respond to messages that arrive via MQTT. Off by default to prevent multiple server responses.
+  - User‑initiated only: The AI does not auto‑message or greet new nodes; it responds only to explicit user input.
+- **Commands modal & startup helper**
+  - WebUI includes a Commands modal (button in the “Send a Message” header) that lists available commands with descriptions.
+  - The current alias suffix and a one‑line commands list are printed at startup for easy reference.
 - **Windows & Linux Focused**
   - Official support for Windows environments with installation guides; instructions for Linux available now - MacOS coming soon!
 
@@ -67,6 +80,38 @@ The Meshtastic logo trademark is the trademark of Meshtastic LLC.
 ---
 
 ## Changelog
+
+### New Updates in v0.5.1 → v0.6.0 - SAFETY, STABILITY & COMMUNITY RESPECT
+- **Mesh safety defaults**
+  - LongFast (channel 0) responses are OFF by default; enable `ai_respond_on_longfast` only if your mesh agrees.
+  - MQTT response gating: new `respond_to_mqtt_messages` flag (default `false`) to prevent multiple servers from replying at once over MQTT.
+  - Community note: Using AI bots on public LongFast channels is generally frowned upon because it increases congestion for everyone. The toggle remains available for isolated/private deployments or special cases, but it is off by default.
+- **Bot‑loop prevention**
+  - All AI replies now start with a tiny fixed marker `m@i` (≤ 3 chars). Other MESH‑AI instances ignore messages that begin with this marker.
+  - Each instance also remembers node IDs that send AI‑tagged messages and ignores further requests from those nodes to mitigate bot‑to‑bot chatter.
+- **User‑initiated only**
+  - No features are planned that allow the AI to auto‑respond to “join/arrive” events or otherwise talk without an explicit message from a legitimate user.
+- **Per‑install command alias**
+  - On first run, a randomized alias (e.g. `/ai-9z`) is generated and saved as `ai_command` in `config.json`. Use it to avoid collisions; you can change it anytime.
+  - Strongly encouraged: customize your commands in `commands_config.json` to minimize collisions on shared meshes/MQTT.
+- **No chain‑of‑thought on mesh**
+  - A global sanitizer removes any “thinking”/reasoning content before sending. This includes XML‑style tags (e.g. `<thinking>…</thinking>`), fenced blocks, YAML/JSON meta fields, and heading lines.
+  - Applied consistently across all providers (LM Studio, OpenAI, Ollama) and Home Assistant so only final answers are transmitted.
+- **Ollama reliability**
+  - Added keep‑alive and request options, simple retries on transient failures, and response normalization plus sanitization for cleaner output.
+- **WebUI**
+  - Fixed ticker behavior: it now correctly honors read/unread state for both DMs and channel messages, and dismissals persist across refreshes.
+  - Refined layout: Direct Messages, Channel Messages, and Available Nodes order; mobile stacking with 3‑wide desktop; controls moved to the “Send a Message” header (top‑right).
+  - New Commands modal overlay: quickly view available commands and descriptions (via the Commands button). Backed by a lightweight JSON endpoint (`/commands_info`).
+  - Scrollable panels with sensible max heights; on mobile, each panel can be collapsed/expanded for easier navigation.
+  - Ticker UX polish: dismiss button is reliably visible and auto‑hides after a short timeout; dismiss state is remembered across refreshes.
+  - Footer badge updated and repositioned: bottom‑right two‑line, centered label “MESH-AI v0.6.0 PR” and “by: MR-TBOT”.
+  - Emoji reactions: every message now includes a React button that toggles a hidden emoji picker; picking an emoji auto‑sends a reaction (works for both DMs and channel messages).
+  - Quick Emoji bar: the “Send a Message” form includes common emojis; clicking inserts into your draft at the cursor without auto‑sending.
+  - Reaction feedback: React buttons show Sending/Sent/Failed states and temporarily disable during send to prevent accidental double‑presses.
+- **Docs & help**
+  - Updated README and in‑app `/help` to highlight safety defaults, MQTT gating, and your unique alias.
+  - New config keys summarized above; defaults favor safety and reduce congestion.
 
 ### New Updates in v0.4.2 → v0.5.1 - NOW IN BETA!
 - **REBRANDED TO MESH-AI** 
@@ -302,21 +347,41 @@ File structure should look like this:
 ## Basic Usage
 
 - **Interacting with the AI:**  
-  - Use `/ai` (or `/bot`, `/query`, `/data`) followed by your message to receive an AI response.
+  - Use your randomized alias shown at startup (e.g., `/ai-9z`) — AI commands require the suffix: `/ai-9z`, `/bot-9z`, `/query-9z`, `/data-9z` followed by your message.
+  - To avoid collisions (multiple bots responding), prefer your unique alias and/or customize commands in `commands_config.json`.
   - For direct messages, simply DM the AI node if configured to reply.
 - **Location Query:**  
-  - Send `/whereami` to retrieve the node’s GPS coordinates (if available).
+  - Send `/whereami-XY` (replace `XY` with your suffix) to retrieve the node’s GPS coordinates (if available).
 - **Emergency Alerts:**  
   - Trigger an emergency using `/emergency <message>` or `/911 <message>`.  
     - These commands send alerts via Twilio, SMTP, and Discord (if enabled), including GPS data and timestamps.
 - **Sending and receiving SMS:**  
-  - Send SMS using `/sms <+15555555555> <message>`
+  - Send SMS using your suffixed command, e.g., `/sms-9z <+15555555555> <message>`
   - Config options to either route incoming Twilio SMS messages to a specific node, or a channel index.
 - **Home Assistant Integration:**  
   - When enabled, messages sent on the designated Home Assistant channel (as defined by `"home_assistant_channel_index"`) are forwarded to Home Assistant’s conversation API.
   - In secure mode, include the PIN in your message (format: `PIN=XXXX your message`).
 - **WebUI Messaging:**  
   - Use the dashboard’s send‑message form to send broadcast or direct messages. The mode toggle and node selection simplify quick replies.
+
+### How AI messages are identified and ignored by other bots
+
+- AI responses include a very short prefix marker `m@i` at the start of the message body. This is not configurable on purpose and is capped at 3 characters to conserve airtime.
+- Other MESH-AI instances will ignore messages that start with this marker, preventing bots from talking to each other.
+- Each instance also tracks node IDs that have sent AI-tagged messages and ignores further messages from those nodes.
+
+#### What is bot‑looping and why is it a problem?
+- Bot‑looping happens when two or more automated agents see each other’s messages as prompts and keep replying back and forth without a human in the loop.
+- On a constrained LoRa mesh, this can quickly saturate airtime (especially on LongFast), drain batteries, and crowd out legitimate traffic.
+- Loops can be surprisingly hard to break because:
+  - Messages may be re‑broadcast via MQTT and multiple gateways, multiplying replies.
+  - Nodes can buffer/retry after brief outages, re‑triggering the loop even if you silence one side.
+  - Different bots might parse/quote each other in ways that keep producing “valid” prompts.
+- MESH‑AI mitigations:
+  - A fixed 3‑char marker (`m@i`) at the start of AI replies so other instances will ignore them.
+  - A memory of node IDs that have emitted AI‑tagged messages to avoid engaging those nodes.
+  - Conservative defaults: no LongFast replies by default and MQTT response gating disabled by default.
+  - Policy: the AI never initiates conversations or responds to arrival/presence events—only explicit human messages.
 
 ---
 
@@ -332,8 +397,12 @@ The MESH-AI server (running on Flask) exposes the following endpoints:
   Get current connection status and error details.
 - **GET `/logs`**  
   View a styled log page showing uptime, restarts, and recent log entries.
+- **GET `/logs_stream`**  
+  Stream recent logs in JSON for lightweight polling.
 - **GET `/dashboard`**  
   Access the full WebUI dashboard.
+- **GET `/commands_info`**  
+  Retrieve a JSON list of available commands and descriptions (used by the in‑app Commands modal).
 - **POST `/send`** and **POST `/ui_send`**  
   Send messages programmatically.
 - **POST `/discord_webhook`**  
@@ -371,6 +440,11 @@ Your `config.json` file controls almost every aspect of MESH-AI. Below is an exa
   "ollama_url": "http://localhost:11434/api/generate",  // URL for Ollama's API
   "ollama_model": "llama3",  // Ollama model (e.g., "llama3")
   "ollama_timeout": 60,  // Timeout in seconds for Ollama API requests
+  "ollama_keep_alive": "5m",  // Keep the selected model loaded (e.g., "5m"); set to "0" to unload immediately
+  "ollama_options": {  // Optional generation options for Ollama requests
+    "num_ctx": 2048,
+    "temperature": 0.2
+  },
 
   "home_assistant_url": "http://homeassistant.local:8123/api/conversation/process",  // Home Assistant API URL for conversation processing
   "home_assistant_token": "INPUT HA TOKEN HERE",  // Home Assistant API token (replace with your token)
@@ -396,6 +470,8 @@ Your `config.json` file controls almost every aspect of MESH-AI. Below is an exa
   
   "reply_in_channels": true,  // Set to true to allow AI to reply in broadcast channels
   "reply_in_directs": true,  // Set to true to allow AI to reply in direct messages
+  "ai_respond_on_longfast": false,  // Do NOT respond on LongFast (channel 0) by default; enable only with mesh/community consent
+  "respond_to_mqtt_messages": false,  // If true, the bot will respond to messages that arrived via MQTT (default false to prevent multi-replies)
   
   "chunk_size": 200,  // Maximum size for message chunks
   "max_ai_chunks": 5,  // Maximum number of chunks to split AI responses into
@@ -403,6 +479,7 @@ Your `config.json` file controls almost every aspect of MESH-AI. Below is an exa
   
   "local_location_string": "@ YOUR LOCATION HERE",  // Local string for your node's location (e.g., "@ Home", "@ Roof Node")
   "ai_node_name": "Mesh-AI-Alpha",  // Name for your AI node
+  "ai_command": "/ai-9z",  // Randomized per-install alias for built-in AI commands to prevent AI clashing and looping (change the suffix to your preference)
   "max_message_log": 0,  // Set the maximum number of messages to log (set to 0 for unlimited)
 
   "enable_twilio": false,  // Set to true to enable Twilio for emergency alerts via SMS
@@ -422,7 +499,11 @@ Your `config.json` file controls almost every aspect of MESH-AI. Below is an exa
   "discord_webhook_url": "",  // Discord Webhook URL (for sending messages to Discord)
   "discord_send_emergency": false,  // Set to true to send emergency alerts to Discord
   "discord_send_ai": false,  // Set to true to send AI responses to Discord
-  "discord_send_all": false  // Set to true to send all messages to Discord
+  "discord_send_all": false,  // Set to true to send all messages to Discord
+  "discord_receive_enabled": false,  // Enable polling Discord for inbound messages
+  "discord_bot_token": "",  // Discord Bot token (required if receive is enabled)
+  "discord_channel_id": "",  // Discord channel ID to poll for inbound messages
+  "discord_inbound_channel_index": 1  // Channel index to route inbound Discord messages into the mesh
 }
 
 ```
@@ -589,15 +670,15 @@ Update your configuration file with the following keys (replace placeholder text
   - If using Home Assistant with PIN protection, follow the specified format (`PIN=XXXX your message`) to ensure messages are accepted.
   
 - **Testing:**  
-  - You can test SMS sending with the `/sms` command or trigger an emergency alert to confirm that Twilio and email integrations are functioning.
+  - You can test SMS sending with your suffixed `/sms-XY` command or trigger an emergency alert to confirm that Twilio and email integrations are functioning.
 
 ---
 
 
 ## Contributing & Disclaimer
 
-- **Alpha Software Notice:**  
-  This release (v0.4.2) is experimental. Expect bugs and changes that might affect existing features. Thorough field testing is recommended before production use.
+- **Beta Software Notice:**  
+  This release (v0.6.0) is in BETA. Expect ongoing changes that may affect existing features. Field testing is recommended before production use.
 - **Feedback & Contributions:**  
   Report issues or submit pull requests on GitHub. Your input is invaluable.
 - **Use Responsibly:**  
@@ -619,7 +700,7 @@ Update your configuration file with the following keys (replace placeholder text
 
 ## Conclusion
 
-MESH-AI BETA v0.5.1 takes the solid foundation of v0.4.2 and introduces even more significant improvements in logging, error handling, and a bit of polish on the web-UI and it's function.  Whether you’re chatting directly with your node, integrating with Home Assistant, or leveraging multi‑channel alerting (Twilio, Email, Discord), this release offers a more comprehensive and reliable off‑grid AI assistant experience.
+MESH-AI BETA v0.6.0 builds on the v0.5.1 foundation with safer defaults, improved resilience, and a more usable WebUI (commands modal, better layout, and clearer startup info). Whether you’re chatting directly with your node, integrating with Home Assistant, or leveraging multi‑channel alerting (Twilio, Email, Discord), this release offers a more comprehensive and reliable off‑grid AI assistant experience.
 
 **Enjoy tinkering, stay safe, and have fun!**  
 Please share your feedback or join our community on GitHub.
