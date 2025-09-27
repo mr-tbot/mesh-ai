@@ -1,8 +1,8 @@
-# MESH-AI (BETA v0.6.0 - PRE-RELEASE 1) - some updated features and packages may introduce unforeseen bugs - PLEASE REPORT ANY ISSUES ASAP BEFORE FULL PACKAGE RELEASE AND DOCKER IMAGE UPDATES.
+# MESH-AI (BETA v0.6.0 - PRE-RELEASE 1) - some updated features and packages may introduce unforeseen bugs - PLEASE REPORT ANY ISSUES ASAP BEFORE FULL PACKAGE RELEASE AND DOCKER IMAGE UPDATES. #
 
 - PLEASE NOTE - There are new requirements and new config options - v0.6.0 updates many required library versions - and brings us into alignment with the 2.7 branch of the Meshtastic Python library!  Old configs should work out of the box - but there are new config flags and a new "description" feature for custom commands in commands_config.json.  Read the changelogs.
 
-# Having issues getting up and running?  As of v0.6.0 I have created a custom GPT with Open-AI to assist anyone having problems - give it a try! - https://chatgpt.com/g/g-68d86345f4c4819183c417b3790499c7-mesh-ai-setup-assistant
+# Having issues getting up and running?  As of v0.6.0 I have created a custom GPT with Open-AI to assist anyone having problems - give it a try! - https://chatgpt.com/g/g-68d86345f4c4819183c417b3790499c7-mesh-ai-setup-assistant #
 
 
 
@@ -44,9 +44,10 @@ The Meshtastic logo trademark is the trademark of Meshtastic LLC.
   - Trigger alerts that are sent via **Twilio SMS**, **SMTP Email**, and, if enabled, **Discord**.
   - Emergency notifications include GPS coordinates, UTC timestamps, and user messages.
 - **Enhanced REST API & WebUI Dashboard**  
-  - A modern three‑column layout showing direct messages, channel messages, and available nodes. Stacks on mobile; 3‑wide on desktop. Controls (suffix, Logs, Commands) live in the “Send a Message” header (top‑right).
+  - A modern three‑column layout showing direct messages, channel messages, and available nodes. Stacks on mobile; 3‑wide on desktop. Controls (Suffix, Commands, Config, Logs) live in the “Send a Message” header (top‑right).
   - Additional endpoints include `/messages`, `/nodes`, `/connection_status`, `/logs`, `/logs_stream`, `/send`, `/ui_send`, `/commands_info` (JSON commands list), and a new `/discord_webhook` for inbound Discord messages.
   - UI customization through settings such as theme color, hue rotation, and custom sounds.
+  - Config Editor (WebUI): Click the “Config” button in the header to view/edit `config.json`, `commands_config.json`, and `motd.json` in a tabbed editor. JSON is validated before saving; writes are atomic. Some changes may require a restart to take effect.
   - Emoji enhancements: each message has a React button that reveals a compact, hidden emoji picker; choosing an emoji auto‑sends a reaction (DM or channel). The send form includes a Quick Emoji bar that inserts emojis into your draft (does not auto‑send).
 - **Improved Message Chunking & Routing**  
   - Automatically splits long AI responses into configurable chunks with delays to reduce radio congestion.
@@ -338,7 +339,7 @@ File structure should look like this:
 
 ---
 
-<img width="3823" height="1984" alt="image" src="https://github.com/user-attachments/assets/42a523a8-677d-4931-84c0-c166743bca86" />
+<img width="3822" height="1984" alt="image" src="https://github.com/user-attachments/assets/3091d1b9-cd59-465f-b3f5-5ea223e315c5" />
 
 
 
@@ -364,6 +365,17 @@ File structure should look like this:
   - In secure mode, include the PIN in your message (format: `PIN=XXXX your message`).
 - **WebUI Messaging:**  
   - Use the dashboard’s send‑message form to send broadcast or direct messages. The mode toggle and node selection simplify quick replies.
+
+### WebUI Config Editor (new)
+
+- Open the dashboard and click the “Config” button in the header (next to Commands/Logs).
+- A tabbed editor appears with three files:
+  - `config.json` — core app settings (providers, timeouts, routing, integrations, etc.)
+  - `commands_config.json` — custom slash commands and AI prompts
+  - `motd.json` — the Message of the Day string shown in the UI
+- Make edits and click Save. The editor validates JSON before saving (for JSON files) and writes changes atomically to prevent partial/corrupted updates.
+- Changes to some settings may require restarting the app/container to take effect (e.g., provider, connectivity, or Discord/Twilio credentials).
+- Security note: If you expose the WebUI beyond localhost, protect access to the dashboard since configuration files may contain secrets (API keys, tokens).
 
 ### How AI messages are identified and ignored by other bots
 
@@ -404,6 +416,10 @@ The MESH-AI server (running on Flask) exposes the following endpoints:
   Access the full WebUI dashboard.
 - **GET `/commands_info`**  
   Retrieve a JSON list of available commands and descriptions (used by the in‑app Commands modal).
+ - **GET `/config_editor/load`**  
+  Load the current contents of `config.json`, `commands_config.json`, and `motd.json` for the WebUI Config Editor.
+ - **POST `/config_editor/save`**  
+  Save updates to the above files. Payload is validated (JSON where applicable) and written atomically. Some settings require an app restart to apply.
 - **POST `/send`** and **POST `/ui_send`**  
   Send messages programmatically.
 - **POST `/discord_webhook`**  
