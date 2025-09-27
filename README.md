@@ -341,7 +341,8 @@ File structure should look like this:
 
 ---
 
-<img width="3822" height="1984" alt="image" src="https://github.com/user-attachments/assets/3091d1b9-cd59-465f-b3f5-5ea223e315c5" />
+<img width="1698" height="862" alt="image" src="https://github.com/user-attachments/assets/e739e599-ce5b-47d1-82c2-512ad3b0d94b" />
+
 
 
 
