@@ -360,7 +360,7 @@ File structure should look like this:
 ---
 
 <img width="1698" height="862" alt="image" src="https://github.com/user-attachments/assets/e739e599-ce5b-47d1-82c2-512ad3b0d94b" />
-
+The latest v0.6.0 Web-UI revamp!  Coming together!
 
 
 
