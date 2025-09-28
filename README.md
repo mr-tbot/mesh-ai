@@ -466,14 +466,14 @@ Your `config.json` file controls almost every aspect of MESH-AI. Below is an exa
     "temperature": 0.2
   },
 
+  "home_assistant_enabled": false,  // Set to true to enable Home Assistant integration
+  "home_assistant_channel_index": 1,  // Index of the channel for Home Assistant messages (set to -1 if not using)
   "home_assistant_url": "http://homeassistant.local:8123/api/conversation/process",  // Home Assistant API URL for conversation processing
   "home_assistant_token": "INPUT HA TOKEN HERE",  // Home Assistant API token (replace with your token)
   "home_assistant_timeout": 90,  // Timeout in seconds for Home Assistant API requests
   "home_assistant_enable_pin": false,  // Set to true to require a PIN for Home Assistant commands
   "home_assistant_secure_pin": "1234",  // PIN for Home Assistant (if enabled)
 
-  "home_assistant_enabled": false,  // Set to true to enable Home Assistant integration
-  "home_assistant_channel_index": 1,  // Index of the channel for Home Assistant messages (set to -1 if not using)
 
   "channel_names": {
     "0": "LongFast",  // Name for Channel 0
