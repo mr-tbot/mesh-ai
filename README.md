@@ -725,8 +725,7 @@ Update your configuration file with the following keys (replace placeholder text
 ---
 
 ## Donations are GRACIOUSLY accepted to stoke development!
-- **PayPal:**  
-  https://www.paypal.com/ncp/payment/XPW23EP9XHMYS
+
 - **BTC:**  
   bc1qcfstyxaktw5ppnsm5djmpvmgv49z0cp6df33tl
 - **XRP:**  
