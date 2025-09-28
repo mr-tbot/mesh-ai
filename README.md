@@ -728,7 +728,7 @@ Update your configuration file with the following keys (replace placeholder text
 
 - **BTC:**  
   bc1qalnp0xze5t9nner2754k2pj7yjhkrt3uzvzdvt
-- **ETH:**
+- **ETH:**  
   0xAd640c506f5d2368cAF420a117380820C0C5F61C
 - **XRP:**  
   rpciwKrQSaRZ1UjPunH8vLJhoM2s4NaYoL
