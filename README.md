@@ -727,11 +727,13 @@ Update your configuration file with the following keys (replace placeholder text
 ## Donations are GRACIOUSLY accepted to stoke development!
 
 - **BTC:**  
-  bc1qcfstyxaktw5ppnsm5djmpvmgv49z0cp6df33tl
+  bc1qalnp0xze5t9nner2754k2pj7yjhkrt3uzvzdvt
+- **ETH:**
+  0xAd640c506f5d2368cAF420a117380820C0C5F61C
 - **XRP:**  
-  TrpgvB8EgTtqhU1W6XJAvx3CS8KKkRwTLHc
+  rpciwKrQSaRZ1UjPunH8vLJhoM2s4NaYoL
 - **DOGE:**  
-  D5MyXVRkwLW9XzcKjjcwEHcXvnaTFueZhy
+  DM79aRx58J6RYuWakHjiELWbNJkTTDj1cv
 
 ---
 
