@@ -1,4 +1,4 @@
-# MESH-AI (BETA v0.6.0 - PRE-RELEASE 1) 
+# MESH-AI (BETA v0.6.0 - PRE-RELEASE 2) 
 
 - some updated features and packages may introduce unforeseen bugs - PLEASE REPORT ANY ISSUES ASAP BEFORE FULL PACKAGE RELEASE AND DOCKER IMAGE UPDATES.
 
